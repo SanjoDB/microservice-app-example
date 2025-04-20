@@ -32,6 +32,6 @@ steps:
       inlineScript: |
         cd infra
         terraform init
-        terraform plan -out=tfplan
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Desplegar infraestructura DEV con Terraform'
