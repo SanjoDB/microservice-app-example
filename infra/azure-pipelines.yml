@@ -1,0 +1,34 @@
+trigger:
+  branches:
+    include:
+      - infra/prod
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  environment: production
+  tf_version: '1.5.5'
+
+steps:
+  - task: TerraformInstaller@0
+    inputs:
+      terraformVersion: '$(tf_version)'
+    displayName: 'Instalar Terraform'
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+    displayName: 'Usar Python para Azure CLI'
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        cd infra
+        terraform init
+        terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
+        terraform apply -auto-approve tfplan
+    displayName: 'Desplegar infraestructura STAGING con Terraform'
