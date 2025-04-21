@@ -54,7 +54,7 @@ steps:
           echo "Verificando $RESOURCE_TYPE..."
           if eval "$CHECK_COMMAND" >/dev/null 2>&1; then
             echo "$RESOURCE_TYPE existe. Importando..."
-            terraform import -var-file="terraform.dev.tfvars" "$BLOCK_NAME" "$RESOURCE_ID"
+            terraform import -var-file="terraform.tfvars" "$BLOCK_NAME" "$RESOURCE_ID"
           else
             echo "$RESOURCE_TYPE no existe. Saltando importación."
           fi
@@ -85,6 +85,6 @@ steps:
           "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachines/$VM_NAME" \
           "az vm show --resource-group $RESOURCE_GROUP --name $VM_NAME --subscription $SUBSCRIPTION_ID"
 
-        terraform plan -var-file="terraform.dev.tfvars" -out=tfplan
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Desplegar infraestructura DEV con Terraform'
