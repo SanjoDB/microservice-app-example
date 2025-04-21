@@ -29,18 +29,6 @@ steps:
       inlineScript: |
         cd infra
         terraform init
-        echo "Importando RG si ya existe..."
-        terraform import azurerm_resource_group.rg "/subscriptions/9c34612c-d9bc-4f45-932e-44a22a08a99b/resourceGroups/rg-prod-microservices" || true
-    displayName: 'Importar RG si existe'
-
-  - task: AzureCLI@2
-    inputs:
-      azureSubscription: 'Kevin'
-      scriptType: 'bash'
-      scriptLocation: 'inlineScript'
-      inlineScript: |
-        cd infra
-        terraform init
         terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Desplegar infraestructura PRODUCTION con Terraform'
