@@ -28,6 +28,7 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         cd infra
+        terraform init
         terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Desplegar infraestructura PRODUCTION con Terraform'
