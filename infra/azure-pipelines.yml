@@ -31,4 +31,4 @@ steps:
         terraform init
         terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
-    displayName: 'Desplegar infraestructura STAGING con Terraform'
+    displayName: 'Desplegar infraestructura PRODUCTION con Terraform'
