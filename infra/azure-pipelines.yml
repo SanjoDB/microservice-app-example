@@ -28,7 +28,11 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         cd infra
-        terraform init -reconfigure
+        terraform init -reconfigure \
+          -backend-config="resource_group_name=rg-terraform-state" \
+          -backend-config="storage_account_name=terraformstate2644016" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=prod.terraform.tfstate"
         terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Desplegar infraestructura PRODUCTION con Terraform'
