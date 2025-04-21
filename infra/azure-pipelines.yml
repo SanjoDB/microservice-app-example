@@ -28,12 +28,58 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         cd infra
-        rm -rf .terraform terraform.tfstate tfplan
+
+        RESOURCE_GROUP="rg-prod-microservices"
+        SUBSCRIPTION_ID="9c34612c-d9bc-4f45-932e-44a22a08a99b"
+        VNET_NAME="vnet-prod"
+        SUBNET_NAME="subnet-prod"
+        NIC_NAME="nic-prod"
+        VM_NAME="prod-vm"
+
         terraform init -reconfigure \
           -backend-config="resource_group_name=rg-terraform-state" \
           -backend-config="storage_account_name=terraformstate2644016" \
           -backend-config="container_name=tfstate" \
           -backend-config="key=prod.terraform.tfstate"
+
+        # Función auxiliar para importar si el recurso existe
+        import_if_exists () {
+          RESOURCE_TYPE=$1
+          RESOURCE_NAME=$2
+          RESOURCE_ID=$3
+          CHECK_COMMAND=$4
+
+          echo "Verificando existencia de $RESOURCE_TYPE: $RESOURCE_NAME..."
+
+          if eval "$CHECK_COMMAND" >/dev/null 2>&1; then
+            echo "$RESOURCE_TYPE existe. Importando a Terraform..."
+            terraform import -var-file="terraform.prod.tfvars" "$RESOURCE_ID"
+          else
+            echo "$RESOURCE_TYPE no existe. Saltando importación."
+          fi
+        }
+
+        import_if_exists "Resource Group" $RESOURCE_GROUP \
+          "azurerm_resource_group.rg" \
+          "az group show --name $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "Virtual Network" $VNET_NAME \
+          "azurerm_virtual_network.vnet" \
+          "az network vnet show --resource-group $RESOURCE_GROUP --name $VNET_NAME --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "Subnet" $SUBNET_NAME \
+          "azurerm_subnet.subnet" \
+          "az network vnet subnet show --resource-group $RESOURCE_GROUP --vnet-name $VNET_NAME --name $SUBNET_NAME --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "NIC" $NIC_NAME \
+          "azurerm_network_interface.nic" \
+          "az network nic show --resource-group $RESOURCE_GROUP --name $NIC_NAME --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "VM" $VM_NAME \
+          "azurerm_linux_virtual_machine.vm" \
+          "az vm show --resource-group $RESOURCE_GROUP --name $VM_NAME --subscription $SUBSCRIPTION_ID"
+
+        # Aplicar infraestructura
         terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
-    displayName: 'Desplegar infraestructura PRODUCTION con Terraform'
+    displayName: 'Importar si existen y desplegar infraestructura PRODUCTION con Terraform'
