@@ -1,2 +1,10 @@
-.terraform
-.terraform.*
+# Terraform state
+*.tfstate
+*.tfstate.backup
+
+# Terraform plan
+tfplan
+
+# Terraform cache y config local
+.terraform/
+.terraform.lock.hcl
