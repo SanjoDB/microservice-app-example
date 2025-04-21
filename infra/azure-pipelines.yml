@@ -23,20 +23,19 @@ steps:
 
   - task: AzureCLI@2
     inputs:
-    azureSubscription: 'Kevin'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      cd infra
-      terraform init
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        cd infra
+        terraform init
 
-      # Verificar si existe el resource group
-      if az group show --name rg-prod-microservices &> /dev/null; then
-        echo "Importando Resource Group existente..."
-        terraform import azurerm_resource_group.rg /subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-prod-microservices || true
-      else
-        echo "No existe el Resource Group. Terraform lo creará."
-      fi
+        if az group show --name rg-prod-microservices &> /dev/null; then
+          echo "Importando Resource Group existente..."
+          terraform import azurerm_resource_group.rg /subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-prod-microservices || true
+        else
+          echo "No existe el Resource Group. Terraform lo creará."
+        fi
     displayName: 'Verificar e importar recursos si existen'
 
   - task: AzureCLI@2
@@ -46,7 +45,6 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         cd infra
-        terraform init
         terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Desplegar infraestructura PRODUCTION con Terraform'
