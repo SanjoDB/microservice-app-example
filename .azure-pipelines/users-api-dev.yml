@@ -1,0 +1,41 @@
+trigger:
+  branches:
+    include:
+      - feature/*
+  paths:
+    include:
+      - users-api/**
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  vm_path: '/home/azureuser/microservice-app-example'
+  service_name: 'users-api'
+  jar_name: 'users-api-0.0.1-SNAPSHOT.jar'
+
+steps:
+- task: SSH@0
+  inputs:
+    sshEndpoint: 'VM-DEV-CONNECTION'
+    runOptions: 'inline'
+    inline: |
+      echo "Entrando a la máquina virtual de desarrollo"
+      cd ${{ variables.vm_path }}
+
+      echo "Cambiando a la rama actual"
+      git fetch
+      CURRENT_BRANCH=$(echo $(Build.SourceBranchName))
+      git checkout $CURRENT_BRANCH || git checkout -b $CURRENT_BRANCH origin/$CURRENT_BRANCH
+      git pull origin $CURRENT_BRANCH
+
+      echo "Compilando Users API con Maven"
+      cd users-api
+      ./mvnw clean package -DskipTests=false
+
+      echo "Deteniendo proceso Java anterior si existe"
+      pkill -f ${{ variables.jar_name }} || echo "No había proceso corriendo"
+
+      echo "Iniciando el nuevo .jar"
+      nohup java -jar target/${{ variables.jar_name }} > ../${{ variables.service_name }}.log 2>&1 &
+  displayName: 'Build y despliegue de Users API en VM DEV'
