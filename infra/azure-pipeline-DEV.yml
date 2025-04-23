@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - infra/dev
+      - infra/dev  # Cambia a la rama que usas para despliegue
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -13,14 +13,17 @@ variables:
   inventory_path: '$(Build.SourcesDirectory)/ansible/inventory/hosts.ini'
 
 steps:
+  # 1. Instalar Terraform
   - task: TerraformInstaller@0
     inputs:
       terraformVersion: '$(tf_version)'
     displayName: 'Instalar Terraform'
 
+  # 2. Verificar la versión de Terraform
   - script: terraform --version
     displayName: 'Verificar versión de Terraform'
 
+  # 3. Ejecutar Terraform para desplegar la infraestructura
   - task: AzureCLI@2
     inputs:
       azureSubscription: 'Kevin'
@@ -35,6 +38,7 @@ steps:
         SUBNET_NAME="subnet-dev"
         NIC_NAME="nic-dev"
         VM_NAME="dev-vm"
+        PUBLIC_IP_NAME="public-ip-dev"
 
         terraform init -reconfigure \
           -backend-config="resource_group_name=rg-terraform-state" \
@@ -58,6 +62,7 @@ steps:
           fi
         }
 
+        # Importar si existen
         import_if_exists "Resource Group" \
           "azurerm_resource_group.rg" \
           "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP" \
@@ -83,10 +88,16 @@ steps:
           "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachines/$VM_NAME" \
           "az vm show --resource-group $RESOURCE_GROUP --name $VM_NAME --subscription $SUBSCRIPTION_ID"
 
+        import_if_exists "Public IP" \
+          "azurerm_public_ip.public_ip" \
+          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/publicIPAddresses/$PUBLIC_IP_NAME" \
+          "az network public-ip show --resource-group $RESOURCE_GROUP --name $PUBLIC_IP_NAME --subscription $SUBSCRIPTION_ID"
+
         terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Importar si existen y desplegar infraestructura DEV con Terraform'
 
+  # 4. Asegurarse de que el directorio de Ansible existe y tiene permisos correctos
   - task: AzureCLI@2
     inputs:
       azureSubscription: 'Kevin'
@@ -97,12 +108,14 @@ steps:
         ssh -o StrictHostKeyChecking=no azureuser@$(publicIpAddress) "mkdir -p /home/azureuser/microservice-app-example/ansible && sudo chown azureuser:azureuser /home/azureuser/microservice-app-example/ansible"
     displayName: 'Asegurar permisos del directorio de Ansible'
 
+  # 5. Copiar archivos de Ansible a la VM
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.SourcesDirectory)/ansible'
       TargetFolder: '/home/azureuser/microservice-app-example/ansible'
     displayName: 'Copiar archivos de Ansible a la VM'
 
+  # 6. Ejecutar el playbook de Ansible para instalar Docker
   - task: AzureCLI@2
     inputs:
       azureSubscription: 'Kevin'
