@@ -87,6 +87,16 @@ steps:
         terraform apply -auto-approve tfplan
     displayName: 'Importar si existen y desplegar infraestructura DEV con Terraform'
 
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Asegurarse de que el directorio de Ansible existe y tiene permisos correctos
+        ssh -o StrictHostKeyChecking=no azureuser@$(publicIpAddress) "mkdir -p /home/azureuser/microservice-app-example/ansible && sudo chown azureuser:azureuser /home/azureuser/microservice-app-example/ansible"
+    displayName: 'Asegurar permisos del directorio de Ansible'
+
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.SourcesDirectory)/ansible'
