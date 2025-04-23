@@ -1,0 +1,47 @@
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: infraPipeline
+      source: SanjoDB.microservice-app-example-DEV
+      trigger:
+        branches:
+          include:
+            - infra/dev
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: SSH@0
+  inputs:
+    sshEndpoint: 'VM-DEV-CONNECTION'
+    runOptions: 'inline'
+    inline: |
+      echo "Instalando herramientas en la VM dev"
+      sudo apt update
+
+      # Java para users-api
+      sudo apt install openjdk-17-jdk -y
+
+      # NodeJS y npm para todos-api y frontend
+      sudo apt install nodejs npm -y
+
+      # Go para auth-api
+      sudo apt install golang -y
+
+      # Python para log-processor
+      sudo apt install python3 python3-pip -y
+
+      # pm2 para ejecutar apps en segundo plano
+      sudo npm install -g pm2
+
+      # Clonar repositorio si no existe
+      cd /home/azureuser
+      if [ ! -d "microservice-app-example" ]; then
+        git clone https://github.com/SanjoDB/microservice-app-example.git
+      fi
+
+      # Configurar pm2 para arranque automático (opcional)
+      pm2 startup systemd -u azureuser --hp /home/azureuser
+  displayName: 'Instalar stack base en la VM'
