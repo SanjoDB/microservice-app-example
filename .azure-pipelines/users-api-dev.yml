@@ -34,9 +34,8 @@ stages:
         displayName: 'Asegurar JDK 8'
 
       - script: |
-          echo "JWT_SECRET=PRFT" >> $BASH_ENV
-          echo "SERVER_PORT=8083" >> $BASH_ENV
-          source $BASH_ENV
+          export JWT_SECRET=PRFT
+          export SERVER_PORT=8083
         displayName: 'Configurar variables de entorno'
 
       - script: |
