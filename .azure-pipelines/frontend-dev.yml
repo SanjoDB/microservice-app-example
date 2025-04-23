@@ -24,6 +24,13 @@ stages:
       - checkout: self
 
       - script: |
+          echo "Instalando Python2 para node-gyp"
+          sudo apt-get update
+          sudo apt-get install -y python2
+          sudo ln -sf python2 /usr/bin/python
+        displayName: 'Instalar Python2 para compatibilidad'
+
+      - script: |
           cd $(service_dir)
           npm install
           npm run build
