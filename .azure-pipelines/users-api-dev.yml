@@ -44,6 +44,13 @@ stages:
           ./mvnw clean install
         displayName: 'Construir con Maven'
 
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: '$(Build.SourcesDirectory)/users-api/target'
+          artifact: 'users-jar'
+          publishLocation: 'pipeline'
+        displayName: 'Publicar JAR como artefacto'
+
   - job: Deploy
     displayName: Deploy to dev VM
     dependsOn: BuildUsersApi
