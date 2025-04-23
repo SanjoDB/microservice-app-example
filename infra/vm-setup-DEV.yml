@@ -16,38 +16,38 @@ variables:
 
 steps:
 - task: SSH@0
-  name: InstalarStack
+  name: InstalarStackBase
   inputs:
     sshEndpoint: VM-DEV-CONNECTION
     runOptions: inline
     inline: |
-      echo "🔧 Instalando herramientas en la VM dev"
+      echo "Instalando herramientas base en la VM de desarrollo"
       export DEBIAN_FRONTEND=noninteractive
       sudo apt-get update -y
-
-      # Java para users-api
-      sudo apt-get install -y openjdk-17-jdk
-
-      # Node.js 16 y npm moderno
+      sudo apt-get install -y \
+        openjdk-17-jdk \
+        python3 python3-pip \
+        golang \
+        build-essential \
+        redis-server \
+        curl git ca-certificates apt-transport-https gnupg lsb-release
+      
+      # Node.js 16 (compatible con todos los servicios en Node y frontend)
       curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
       sudo apt-get install -y nodejs
-      sudo npm install -g npm@latest
+      sudo npm install -g npm@latest pm2
 
-      # Go para auth-api
-      sudo apt-get install -y golang
+      # Instalar paquetes de Python requeridos por log-processor
+      sudo pip3 install redis==2.10.6 py_zipkin requests cython
 
-      # Python para log-processor
-      sudo apt-get install -y python3 python3-pip
-
-      # pm2 para ejecución de procesos NodeJS
-      sudo npm install -g pm2
-
-      # Clonar el repo si no existe
+      # Crear carpeta de trabajo
       cd ~
       if [ ! -d "microservice-app-example" ]; then
         git clone https://github.com/SanjoDB/microservice-app-example.git
       else
-        echo "Repositorio ya existe. Saltando clonación."
+        echo "Repositorio ya clonado."
       fi
-      echo "✅ Stack base instalado correctamente"
+
+      echo "Entorno listo para todos los microservicios"
   displayName: "Instalar stack base en la VM"
+
