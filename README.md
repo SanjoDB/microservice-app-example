@@ -1,17 +1,81 @@
-# Microservice App - PRFT Devops Training
+## Documentación y Entrega
 
-This is the application you are going to use through the whole traninig. This, hopefully, will teach you the fundamentals you need in a real project. You will find a basic TODO application designed with a [microservice architecture](https://microservices.io). Although is a TODO application, it is interesting because the microservices that compose it are written in different programming language or frameworks (Go, Python, Vue, Java, and NodeJS). With this design you will experiment with multiple build tools and environments. 
+### 1. Objetivo del Proyecto
+Desarrollar e implementar una arquitectura de microservicios que permita gestionar tareas (todos), autenticación de usuarios y procesamiento de logs, integrando prácticas modernas de DevOps (CI/CD en Azure DevOps) y patrones de arquitectura cloud como **Health Endpoint Monitoring** y **Gateway Aggregation**.
 
-## Components
-In each folder you can find a more in-depth explanation of each component:
+---
 
-1. [Users API](/users-api) is a Spring Boot application. Provides user profiles. At the moment, does not provide full CRUD, just getting a single user and all users.
-2. [Auth API](/auth-api) is a Go application, and provides authorization functionality. Generates [JWT](https://jwt.io/) tokens to be used with other APIs.
-3. [TODOs API](/todos-api) is a NodeJS application, provides CRUD functionality over user's TODO records. Also, it logs "create" and "delete" operations to [Redis](https://redis.io/) queue.
-4. [Log Message Processor](/log-message-processor) is a queue processor written in Python. Its purpose is to read messages from a Redis queue and print them to standard output.
-5. [Frontend](/frontend) Vue application, provides UI.
+### 2. Estructura de Microservicios
 
-## Architecture
+| Microservicio           | Lenguaje         | Descripción                                                                 |
+|-------------------------|------------------|-----------------------------------------------------------------------------|
+| `auth-api`              | Go               | Maneja autenticación y generación de tokens JWT.                            |
+| `users-api`             | Java (Spring)    | Exposición de usuarios y verificación de credenciales.                      |
+| `todos-api`             | Node.js          | Gestión de tareas: creación, listado y eliminación.                         |
+| `log-message-processor` | Python           | Procesa logs desde una cola Redis.                                          |
+| `frontend`              | Vue/JS           | Interfaz gráfica que interactúa con los demás microservicios.               |
 
-Take a look at the components diagram that describes them and their interactions.
-![microservice-app-example](/arch-img/Microservices.png)
+---
+
+### 3. CI/CD con Azure DevOps
+
+- Pipelines separados para `build` y `deploy` de cada microservicio.
+- En entorno **Dev**, el despliegue se realiza en una VM Linux usando **PM2**.
+- En **Staging** y **Prod**, las VMs realizan `git pull` y compilan localmente tras recibir PR.
+
+---
+
+### 4. Patrones Cloud Implementados
+
+#### Health Endpoint Monitoring
+Todos los microservicios exponen un endpoint HTTP `/health` que retorna:
+```json
+{ "status": "UP" }
+```
+
+#### Gateway Aggregation
+El frontend actúa como consumidor de múltiples servicios:
+
+auth-api: login y JWT
+
+users-api: validación de usuario
+
+todos-api: operaciones CRUD
+
+Se planea agregar un gateway unificado en etapas posteriores.
+
+### 5. Flujo del Sistema
+
+El usuario hace login desde el frontend → auth-api.
+
+Se genera un JWT y se usa para acceder a todos-api.
+
+Cada operación genera un log enviado a Redis.
+
+log-message-processor consume mensajes de Redis y los registra.
+
+users-api ofrece información de usuario solicitada por auth-api.
+
+### 6. Diagrama de Arquitectura
+
+Mirar la carpeta docs
+
+### 7. Recursos Técnicos
+
+Variables de entorno detalladas en cada microservicio.
+
+Todos los servicios responden en /health.
+
+Pruebas funcionales realizadas con curl y validadas en VM Dev.
+
+ZIPKIN utilizado para trazabilidad distribuida (en todos los servicios).
+
+### 8. Evidencias de Entrega
+
+Repositorio GitHub: microservice-app-example
+
+Pipelines en Azure DevOps corriendo correctamente.
+
+Diagrama de arquitectura actualizado.
+
+Logs de ejecución incluidos en cada VM por medio de pm2 logs.
