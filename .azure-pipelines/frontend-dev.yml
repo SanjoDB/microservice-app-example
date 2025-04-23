@@ -43,10 +43,10 @@ stages:
       - task: CopyFilesOverSSH@0
         inputs:
           sshEndpoint: VM-DEV-CONNECTION
-          sourceFolder: $(Build.SourcesDirectory)/frontend
+          sourceFolder: $(Build.SourcesDirectory)/frontend/dist
           contents: '**'
-          targetFolder: $(remote_dir)
-        displayName: 'Copiar archivos a la VM'
+          targetFolder: $(remote_dir)/dist
+        displayName: 'Copiar build del frontend a la VM'
 
       - task: SSH@0
         inputs:
@@ -54,7 +54,7 @@ stages:
           runOptions: inline
           inline: |
             echo "Desplegando frontend en la VM"
-            pm2 delete frontend || true
-            cd $(remote_dir)
-            PORT=8080 AUTH_API_ADDRESS=http://127.0.0.1:8000 TODOS_API_ADDRESS=http://127.0.0.1:8082 pm2 start "npm start" --name frontend
+            pm2 delete frontend >/dev/null 2>&1 || echo "No existía proceso previo"
+            cd $(remote_dir)/dist
+            PORT=8080 AUTH_API_ADDRESS=http://127.0.0.1:8000 TODOS_API_ADDRESS=http://127.0.0.1:8082 pm2 serve . 8080 --spa --name frontend
         displayName: 'Ejecutar en la VM'
