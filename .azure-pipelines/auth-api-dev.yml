@@ -1,0 +1,67 @@
+trigger:
+  branches:
+    include:
+      - feature/*
+      - main
+  paths:
+    include:
+      - auth-api/**
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  service_dir: 'auth-api'
+  binary_name: 'auth-api'
+  vm_ip: '172.172.172.182'
+  remote_dir: '~/microservice-app-example/auth-api'
+
+stages:
+- stage: BuildAndDeploy
+  jobs:
+  - job: BuildAuthApi
+    displayName: 'Build de Auth API'
+    steps:
+      - checkout: self
+
+      - task: GoTool@0
+        inputs:
+          version: '1.18.2'
+
+      - script: |
+          cd $(service_dir)
+          export GO111MODULE=on
+          go mod init auth-api || true
+          go mod tidy
+          go build -o $(binary_name)
+        displayName: 'Compilar servicio Go'
+
+      - publish: $(service_dir)/$(binary_name)
+        artifact: auth-api-binary
+
+  - job: Deploy
+    dependsOn: BuildAuthApi
+    displayName: 'Deploy to dev VM'
+    steps:
+      - download: current
+        artifact: auth-api-binary
+
+      - task: CopyFilesOverSSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          sourceFolder: $(Pipeline.Workspace)/auth-api-binary
+          contents: $(binary_name)
+          targetFolder: $(remote_dir)
+        displayName: 'Copiar binario a VM'
+
+      - task: SSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          runOptions: inline
+          inline: |
+            echo "Desplegando auth-api en la VM"
+            pm2 delete auth-api >/dev/null 2>&1 || echo "Proceso no existía, continuando..."
+            cd $(remote_dir)
+            chmod +x $(binary_name)
+            JWT_SECRET=PRFT AUTH_API_PORT=8000 USERS_API_ADDRESS=http://127.0.0.1:8083 pm2 start ./$(binary_name) --name auth-api
+        displayName: 'Ejecutar auth-api con PM2'
