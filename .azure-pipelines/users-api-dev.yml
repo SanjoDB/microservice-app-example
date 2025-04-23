@@ -13,63 +13,64 @@ pool:
 variables:
   service_dir: 'users-api'
   artifact_name: 'users-api-0.0.1-SNAPSHOT.jar'
-  artifact_path: 'users-api/target/users-api-0.0.1-SNAPSHOT.jar'
   vm_ip: '172.172.172.182'
   remote_dir: '~/microservice-app-example/users-api'
 
 stages:
-- stage: BuildAndDeploy
+- stage: Build
+  displayName: 'Validar compilación local en Azure DevOps'
   jobs:
+    - job: BuildOnly
+      displayName: 'Compilar users-api localmente (sin desplegar)'
+      steps:
+        - checkout: self
 
-  - job: BuildUsersApi
-    displayName: 'Build de Users API'
-    steps:
-      - checkout: self
+        - task: JavaToolInstaller@0
+          inputs:
+            versionSpec: '8'
+            jdkArchitectureOption: 'x64'
+            jdkSourceOption: 'PreInstalled'
+          displayName: 'Asegurar JDK 8'
 
-      - task: JavaToolInstaller@0
-        inputs:
-          versionSpec: '8'
-          jdkArchitectureOption: 'x64'
-          jdkSourceOption: 'PreInstalled'
-        displayName: 'Asegurar JDK 8'
+        - script: |
+            cd $(service_dir)
+            chmod +x mvnw
+            export JWT_SECRET=PRFT
+            export SERVER_PORT=8083
+            ./mvnw clean install -DskipTests
+          displayName: 'Compilar users-api (verificación)'
 
-      - script: |
-          cd $(service_dir)
-          chmod +x mvnw
-          export JWT_SECRET=PRFT
-          export SERVER_PORT=8083
-          ./mvnw clean install -DskipTests
-        displayName: 'Construir con Maven'
+- stage: DeployToVM
+  displayName: 'Deploy en VM de Desarrollo desde Git'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+    - job: DeployUsersApi
+      displayName: 'Desplegar users-api directamente desde el repo en la VM'
+      steps:
+        - checkout: none
 
-      - task: PublishPipelineArtifact@1
-        inputs:
-          targetPath: '$(Build.SourcesDirectory)/users-api/target'
-          artifact: 'users-jar'
-          publishLocation: 'pipeline'
-        displayName: 'Publicar JAR como artefacto'
+        - task: SSH@0
+          inputs:
+            sshEndpoint: VM-DEV-CONNECTION
+            runOptions: inline
+            inline: |
+              echo "Git Pull en la VM"
+              cd ~/microservice-app-example
+              git pull origin main
 
-  - job: Deploy
-    displayName: 'Deploy en VM de Desarrollo'
-    dependsOn: BuildUsersApi
-    steps:
-      - download: current
-        artifact: users-jar
+              echo "Entrando a $(remote_dir)"
+              cd $(remote_dir)
 
-      - task: CopyFilesOverSSH@0
-        inputs:
-          sshEndpoint: VM-DEV-CONNECTION
-          sourceFolder: $(Pipeline.Workspace)/users-jar
-          contents: $(artifact_name)
-          targetFolder: $(remote_dir)/target
-        displayName: 'Copiar JAR a la VM'
+              echo "Cerrando instancia anterior de users-api"
+              pm2 delete users-api >/dev/null 2>&1 || echo "No había instancia corriendo"
 
-      - task: SSH@0
-        inputs:
-          sshEndpoint: VM-DEV-CONNECTION
-          runOptions: inline
-          inline: |
-            echo "⚙️ Desplegando users-api en la VM"
-            cd $(remote_dir)
-            pm2 delete users-api || echo "No existía"
-            JWT_SECRET=PRFT SERVER_PORT=8083 pm2 start "java -jar target/$(artifact_name)" --name users-api
-        displayName: 'Ejecutar en la VM'
+              echo "Compilando dentro de la VM"
+              export JWT_SECRET=PRFT
+              export SERVER_PORT=8083
+              chmod +x mvnw
+              ./mvnw clean install -DskipTests
+
+              echo "Iniciando users-api en PM2"
+              pm2 start "java -jar target/$(artifact_name)" --name users-api
+          displayName: 'Compilar y ejecutar dentro de la VM'
