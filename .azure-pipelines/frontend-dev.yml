@@ -20,34 +20,30 @@ stages:
   jobs:
   - job: DeployFrontend
     displayName: 'Deploy Frontend'
-    pool:
-      vmImage: 'ubuntu-latest'
-
     steps:
       - checkout: self
 
-      - task: UseNode@1
+      - task: NodeTool@0
         inputs:
-          version: '14.x'  # Usa una versión estable y compatible con node-sass
-        displayName: 'Usar Node.js 14'
+          versionSpec: '14.x'
+        displayName: 'Instalar Node.js 14'
 
       - script: |
-          echo "🔧 Instalando Python2 para node-gyp"
-          sudo apt-get update
-          sudo apt-get install -y python2
-          sudo ln -sf python2 /usr/bin/python
-        displayName: 'Instalar Python2'
+          sudo apt update
+          sudo apt install -y python2
+          sudo ln -sf /usr/bin/python2 /usr/bin/python
+        displayName: 'Instalar Python 2'
 
       - script: |
-          cd $(service_dir)
-          npm install
+          cd frontend
+          npm ci
           npm run build
-        displayName: 'Construir Frontend con NPM'
+        displayName: 'Instalar dependencias y construir frontend'
 
       - task: CopyFilesOverSSH@0
         inputs:
           sshEndpoint: VM-DEV-CONNECTION
-          sourceFolder: $(Build.SourcesDirectory)/$(service_dir)
+          sourceFolder: $(Build.SourcesDirectory)/frontend
           contents: '**'
           targetFolder: $(remote_dir)
         displayName: 'Copiar archivos a la VM'
@@ -57,8 +53,8 @@ stages:
           sshEndpoint: VM-DEV-CONNECTION
           runOptions: inline
           inline: |
-            echo "🚀 Desplegando frontend en la VM"
-            pm2 delete frontend >/dev/null 2>&1 || echo "Proceso no existía, continuando..."
+            echo "Desplegando frontend en la VM"
+            pm2 delete frontend || true
             cd $(remote_dir)
             PORT=8080 AUTH_API_ADDRESS=http://127.0.0.1:8000 TODOS_API_ADDRESS=http://127.0.0.1:8082 pm2 start "npm start" --name frontend
         displayName: 'Ejecutar en la VM'
