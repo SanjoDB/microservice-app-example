@@ -2,4 +2,3 @@
   become: yes
   roles:
     - role: docker_install
-    - role: docker_containers
