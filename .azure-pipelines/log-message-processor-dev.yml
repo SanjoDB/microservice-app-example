@@ -1,0 +1,48 @@
+trigger:
+  branches:
+    include:
+      - feature/*
+      - main
+  paths:
+    include:
+      - log-message-processor/**
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  service_dir: 'log-message-processor'
+  vm_ip: '172.172.172.182'
+  remote_dir: '~/microservice-app-example/log-message-processor'
+
+stages:
+- stage: BuildAndDeploy
+  jobs:
+  - job: DeployLogProcessor
+    displayName: 'Deploy log-message-processor'
+    steps:
+      - checkout: self
+
+      - script: |
+          cd $(service_dir)
+          pip3 install -r requirements.txt --user
+        displayName: 'Instalar dependencias con pip3'
+
+      - task: CopyFilesOverSSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          sourceFolder: $(Build.SourcesDirectory)/$(service_dir)
+          contents: '**'
+          targetFolder: $(remote_dir)
+        displayName: 'Copiar archivos a la VM'
+
+      - task: SSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          runOptions: inline
+          inline: |
+            echo "Desplegando log-message-processor en la VM"
+            pm2 delete log-processor >/dev/null 2>&1 || echo "Proceso no existía, continuando..."
+            cd $(remote_dir)
+            REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_CHANNEL=log_channel pm2 start "python3 main.py" --name log-processor
+        displayName: 'Ejecutar en la VM'
