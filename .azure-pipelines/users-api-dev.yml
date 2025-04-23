@@ -21,7 +21,7 @@ stages:
   displayName: 'Validar compilación local en Azure DevOps'
   jobs:
     - job: BuildOnly
-      displayName: 'Compilar users-api localmente (sin desplegar)'
+      displayName: 'Compilar users-api'
       steps:
         - checkout: self
 
@@ -57,7 +57,7 @@ stages:
             inline: |
               echo "Git Pull en la VM"
               cd ~/microservice-app-example
-              git pull origin main
+              git pull origin master
 
               echo "Entrando a $(remote_dir)"
               cd $(remote_dir)
