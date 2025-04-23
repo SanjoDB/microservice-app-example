@@ -28,18 +28,64 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         cd infra
-        terraform init
-        terraform apply -auto-approve
 
-        # Capturar los outputs de Terraform
-        publicIpAddress=$(terraform output -raw vm_public_ip)
-        adminPassword=$(terraform output -raw admin_password)
+        RESOURCE_GROUP="rg-dev-microservices"
+        SUBSCRIPTION_ID="9c34612c-d9bc-4f45-932e-44a22a08a99b"
+        VNET_NAME="vnet-dev"
+        SUBNET_NAME="subnet-dev"
+        NIC_NAME="nic-dev"
+        VM_NAME="dev-vm"
 
-        # Crear el archivo de inventario para Ansible
-        inventoryContent="[azure_vm]\n$publicIpAddress ansible_user=azureuser ansible_ssh_pass=$adminPassword"
-        echo -e "$inventoryContent" > $(inventory_path)
+        terraform init -reconfigure \
+          -backend-config="resource_group_name=rg-terraform-state" \
+          -backend-config="storage_account_name=terraformstate2644016" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=dev.terraform.tfstate"
 
-    displayName: 'Desplegar infraestructura DEV con Terraform y generar inventario Ansible'
+        # Función para importar recursos si existen
+        import_if_exists () {
+          RESOURCE_TYPE=$1
+          BLOCK_NAME=$2
+          RESOURCE_ID=$3
+          CHECK_COMMAND=$4
+
+          echo "Verificando $RESOURCE_TYPE..."
+          if eval "$CHECK_COMMAND" >/dev/null 2>&1; then
+            echo "$RESOURCE_TYPE existe. Importando..."
+            terraform import -var-file="terraform.tfvars" "$BLOCK_NAME" "$RESOURCE_ID"
+          else
+            echo "$RESOURCE_TYPE no existe. Saltando importación."
+          fi
+        }
+
+        import_if_exists "Resource Group" \
+          "azurerm_resource_group.rg" \
+          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP" \
+          "az group show --name $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "Virtual Network" \
+          "azurerm_virtual_network.vnet" \
+          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME" \
+          "az network vnet show --resource-group $RESOURCE_GROUP --name $VNET_NAME --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "Subnet" \
+          "azurerm_subnet.subnet" \
+          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME/subnets/$SUBNET_NAME" \
+          "az network vnet subnet show --resource-group $RESOURCE_GROUP --vnet-name $VNET_NAME --name $SUBNET_NAME --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "NIC" \
+          "azurerm_network_interface.nic" \
+          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/networkInterfaces/$NIC_NAME" \
+          "az network nic show --resource-group $RESOURCE_GROUP --name $NIC_NAME --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "VM" \
+          "azurerm_linux_virtual_machine.vm" \
+          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachines/$VM_NAME" \
+          "az vm show --resource-group $RESOURCE_GROUP --name $VM_NAME --subscription $SUBSCRIPTION_ID"
+
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+        terraform apply -auto-approve tfplan
+    displayName: 'Importar si existen y desplegar infraestructura DEV con Terraform'
 
   - task: CopyFiles@2
     inputs:
@@ -53,6 +99,7 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
+        # Ejecutar el playbook de Ansible para instalar Docker
         wsl bash -c "cd $(ansible_path) && \
             export ANSIBLE_ROLES_PATH=./roles && \
             export ANSIBLE_HOST_KEY_CHECKING=False && \
