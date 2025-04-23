@@ -67,8 +67,6 @@ resource "azurerm_linux_virtual_machine" "vm" {
   }
 
   disable_password_authentication = false
-
-  custom_data = filebase64("${path.module}/cloud-init.yml")
 }
 
 output "vm_ip_address" {
@@ -79,4 +77,10 @@ output "vm_ip_address" {
 output "vm_public_ip" {
   description = "Dirección IP pública de la VM"
   value       = azurerm_public_ip.public_ip.ip_address
+}
+
+output "admin_password" {
+  description = "Contraseña de administrador de la VM"
+  value       = var.admin_password
+  sensitive   = true
 }
