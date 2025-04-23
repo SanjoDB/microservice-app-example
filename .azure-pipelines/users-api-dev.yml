@@ -19,19 +19,31 @@ variables:
 stages:
 - stage: BuildAndDeploy
   jobs:
-  - job: Build
-    displayName: Build users-api
+  - job: BuildUsersApi
+    displayName: 'Build de Users API'
+    pool:
+      vmImage: 'ubuntu-latest'
     steps:
-    - checkout: self
+      - checkout: self
 
-    - script: |
-        cd $(service_dir)
-        chmod +x mvnw
-        ./mvnw clean install
-      displayName: Build with Maven
+      - task: JavaToolInstaller@0
+        inputs:
+          versionSpec: '8'
+          jdkArchitectureOption: 'x64'
+          jdkSourceOption: 'PreInstalled'
+        displayName: 'Asegurar JDK 8'
 
-    - publish: $(service_dir)/target/$(artifact_name)
-      artifact: users-jar
+      - script: |
+          echo "JWT_SECRET=PRFT" >> $BASH_ENV
+          echo "SERVER_PORT=8083" >> $BASH_ENV
+          source $BASH_ENV
+        displayName: 'Configurar variables de entorno'
+
+      - script: |
+          cd users-api
+          chmod +x mvnw
+          ./mvnw clean install
+        displayName: 'Construir con Maven'
 
   - job: Deploy
     displayName: Deploy to dev VM
