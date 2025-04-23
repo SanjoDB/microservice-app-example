@@ -1,48 +1,25 @@
-trigger: none
-
-resources:
-  pipelines:
-    - pipeline: infraPipeline
-      source: SanjoDB.microservice-app-example-DEV
-      trigger:
-        branches:
-          include:
-            - infra/dev
+trigger:
+  branches:
+    include:
+      - feature/*
+  paths:
+    include:
+      - users-api/**
 
 pool:
   vmImage: 'ubuntu-latest'
 
-steps:
-- task: SSH@0
-  inputs:
-    sshEndpoint: 'VM-DEV-CONNECTION'
-    runOptions: 'inline'
-    inline: |
-      echo "Instalando herramientas en la VM dev"
-      export DEBIAN_FRONTEND=noninteractive
-      sudo apt-get update -y
-
-      trigger: none
-
-resources:
-  pipelines:
-    - pipeline: infraPipeline
-      source: SanjoDB.microservice-app-example-DEV
-      trigger:
-        branches:
-          include:
-            - infra/dev
-
-pool:
-  vmImage: 'ubuRE
-  
-  ntu-latest'
+variables:
+  vm_path: '/home/azureuser/microservice-app-example'
+  service_name: 'users-api'
+  jar_name: 'users-api-0.0.1-SNAPSHOT.jar'
 
 steps:
 - task: SSH@0
+  name: InstalarStack
   inputs:
-    sshEndpoint: 'VM-DEV-CONNECTION'
-    runOptions: 'inline'
+    sshEndpoint: VM-DEV-CONNECTION
+    runOptions: inline
     inline: |
       echo "🔧 Instalando herramientas en la VM dev"
       export DEBIAN_FRONTEND=noninteractive
@@ -51,7 +28,7 @@ steps:
       # Java para users-api
       sudo apt-get install -y openjdk-17-jdk
 
-      # NodeJS 16.x y npm actualizado
+      # Node.js 16 y npm moderno
       curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
       sudo apt-get install -y nodejs
       sudo npm install -g npm@latest
@@ -62,17 +39,15 @@ steps:
       # Python para log-processor
       sudo apt-get install -y python3 python3-pip
 
-      # pm2 para ejecutar apps en segundo plano
+      # pm2 para ejecución de procesos NodeJS
       sudo npm install -g pm2
 
-      # Clonar repositorio si no existe
-      cd /home/azureuser
+      # Clonar el repo si no existe
+      cd ~
       if [ ! -d "microservice-app-example" ]; then
         git clone https://github.com/SanjoDB/microservice-app-example.git
+      else
+        echo "Repositorio ya existe. Saltando clonación."
       fi
-
-      # Configurar pm2 para arranque automático
-      pm2 startup systemd -u azureuser --hp /home/azureuser
-  displayName: 'Instalar stack base en la VM'
-r
-  displayName: 'Instalar stack base en la VM'
+      echo "✅ Stack base instalado correctamente"
+  displayName: "Instalar stack base en la VM"
