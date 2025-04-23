@@ -72,7 +72,7 @@ stages:
         runOptions: inline
         inline: |
           echo "⚙️ Desplegando users-api en la VM"
-          pm2 delete users-api || true
+          pm2 describe users-api > /dev/null && pm2 delete users-api || echo "No existe users-api, se salta eliminación"
           cd $(remote_dir)
           JWT_SECRET=PRFT SERVER_PORT=8083 pm2 start "java -jar target/$(artifact_name)" --name users-api
       displayName: Ejecutar en la VM
