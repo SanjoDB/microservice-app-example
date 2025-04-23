@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - infra/dev
+      - infra/dev  # Cambia a la rama de tu entorno
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -9,6 +9,7 @@ pool:
 variables:
   environment: dev
   tf_version: '1.5.5'
+  ansible_path: '/home/azureuser/microservice-app-example/ansible'  # Ruta del directorio de Ansible en la VM
 
 steps:
   - task: TerraformInstaller@0
@@ -88,3 +89,42 @@ steps:
         terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
     displayName: 'Desplegar infraestructura DEV con Terraform'
+
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)/ansible'
+      TargetFolder: '/home/azureuser/microservice-app-example/ansible'
+    displayName: 'Copiar archivos de Ansible a la VM'
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Obtener la IP pública de la VM
+        PUBLIC_IP=$(terraform output -raw vm_public_ip)
+        echo "IP Pública de la VM: $PUBLIC_IP"
+
+        # Crear el archivo de inventario para Ansible
+        INVENTORY_CONTENT="[azure_vm]$PUBLIC_IP ansible_user=azureuser ansible_ssh_pass=$(terraform output -raw admin_password)"
+
+        echo "$INVENTORY_CONTENT" > inventory/hosts.ini
+
+        # Ejecutar Ansible playbook
+        wsl bash -c "cd $(ansible_path) && \
+            export ANSIBLE_ROLES_PATH=./roles && \
+            export ANSIBLE_HOST_KEY_CHECKING=False && \
+            ansible-playbook -i inventory/hosts.ini playbooks/install_docker.yml"
+    displayName: 'Ejecutar Ansible para configurar Docker y Microservicios'
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Ejecutar el playbook para levantar los contenedores con Docker Compose
+        wsl bash -c "cd $(ansible_path) && \
+            ansible-playbook -i inventory/hosts.ini playbooks/docker_containers.yml"
+    displayName: 'Levantar los contenedores con Ansible'

@@ -1,0 +1,5 @@
+- name: Iniciar todos los contenedores con Docker Compose
+  shell: |
+    cd /home/azureuser/microservice-app-example && docker-compose up -d
+  args:
+    chdir: /home/azureuser/microservice-app-example

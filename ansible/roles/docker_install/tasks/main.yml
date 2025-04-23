@@ -1,0 +1,43 @@
+- name: Instalar dependencias de Docker
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+- name: Agregar la clave GPG oficial de Docker
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Agregar el repositorio de Docker
+  ansible.builtin.apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+
+- name: Instalar Docker CE
+  apt:
+    name: docker-ce
+    state: present
+    update_cache: yes
+
+- name: Instalar Docker Compose
+  apt:
+    name: docker-compose
+    state: present
+    update_cache: yes
+
+- name: Habilitar Docker para iniciar al arranque
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+
+- name: Agregar usuario al grupo Docker
+  user:
+    name: azureuser
+    groups: docker
+    append: yes
