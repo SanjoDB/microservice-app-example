@@ -13,16 +13,16 @@ pool:
 variables:
   service_dir: 'users-api'
   artifact_name: 'users-api-0.0.1-SNAPSHOT.jar'
+  artifact_path: 'users-api/target/users-api-0.0.1-SNAPSHOT.jar'
   vm_ip: '172.172.172.182'
   remote_dir: '~/microservice-app-example/users-api'
 
 stages:
 - stage: BuildAndDeploy
   jobs:
+
   - job: BuildUsersApi
     displayName: 'Build de Users API'
-    pool:
-      vmImage: 'ubuntu-latest'
     steps:
       - checkout: self
 
@@ -34,14 +34,11 @@ stages:
         displayName: 'Asegurar JDK 8'
 
       - script: |
+          cd $(service_dir)
+          chmod +x mvnw
           export JWT_SECRET=PRFT
           export SERVER_PORT=8083
-        displayName: 'Configurar variables de entorno'
-
-      - script: |
-          cd users-api
-          chmod +x mvnw
-          ./mvnw clean install
+          ./mvnw clean install -DskipTests
         displayName: 'Construir con Maven'
 
       - task: PublishPipelineArtifact@1
@@ -52,27 +49,27 @@ stages:
         displayName: 'Publicar JAR como artefacto'
 
   - job: Deploy
-    displayName: Deploy to dev VM
+    displayName: 'Deploy en VM de Desarrollo'
     dependsOn: BuildUsersApi
     steps:
-    - download: current
-      artifact: users-jar
+      - download: current
+        artifact: users-jar
 
-    - task: CopyFilesOverSSH@0
-      inputs:
-        sshEndpoint: VM-DEV-CONNECTION
-        sourceFolder: $(Pipeline.Workspace)/users-jar
-        contents: $(artifact_name)
-        targetFolder: $(remote_dir)/target
-      displayName: Copiar JAR a la VM
+      - task: CopyFilesOverSSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          sourceFolder: $(Pipeline.Workspace)/users-jar
+          contents: $(artifact_name)
+          targetFolder: $(remote_dir)/target
+        displayName: 'Copiar JAR a la VM'
 
-    - task: SSH@0
-      inputs:
-        sshEndpoint: VM-DEV-CONNECTION
-        runOptions: inline
-        inline: |
-          echo "⚙️ Desplegando users-api en la VM"
-          pm2 describe users-api > /dev/null && pm2 delete users-api || echo "No existe users-api, se salta eliminación"
-          cd $(remote_dir)
-          JWT_SECRET=PRFT SERVER_PORT=8083 pm2 start "java -jar target/$(artifact_name)" --name users-api
-      displayName: Ejecutar en la VM
+      - task: SSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          runOptions: inline
+          inline: |
+            echo "⚙️ Desplegando users-api en la VM"
+            cd $(remote_dir)
+            pm2 delete users-api || echo "No existía"
+            JWT_SECRET=PRFT SERVER_PORT=8083 pm2 start "java -jar target/$(artifact_name)" --name users-api
+        displayName: 'Ejecutar en la VM'
