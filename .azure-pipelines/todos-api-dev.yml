@@ -51,7 +51,7 @@ stages:
           runOptions: inline
           inline: |
             echo "Desplegando todos-api en la VM"
-            pm2 delete todos-api || true
+            pm2 delete todos-api >/dev/null 2>&1 || echo "Proceso no existía, continuando..."
             cd $(remote_dir)
             JWT_SECRET=PRFT TODO_API_PORT=8082 REDIS_HOST=localhost REDIS_PORT=6379 REDIS_CHANNEL=todos pm2 start "npm start" --name todos-api
         displayName: 'Ejecutar en la VM'
