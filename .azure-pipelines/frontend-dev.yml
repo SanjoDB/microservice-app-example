@@ -1,0 +1,49 @@
+trigger:
+  branches:
+    include:
+      - feature/*
+      - main
+  paths:
+    include:
+      - frontend/**
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  service_dir: 'frontend'
+  vm_ip: '172.172.172.182'
+  remote_dir: '~/microservice-app-example/frontend'
+
+stages:
+- stage: BuildAndDeploy
+  jobs:
+  - job: DeployFrontend
+    displayName: 'Deploy Frontend'
+    steps:
+      - checkout: self
+
+      - script: |
+          cd $(service_dir)
+          npm install
+          npm run build
+        displayName: 'Construir Frontend con NPM'
+
+      - task: CopyFilesOverSSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          sourceFolder: $(Build.SourcesDirectory)/$(service_dir)
+          contents: '**'
+          targetFolder: $(remote_dir)
+        displayName: 'Copiar archivos a la VM'
+
+      - task: SSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          runOptions: inline
+          inline: |
+            echo "Desplegando frontend en la VM"
+            pm2 delete frontend >/dev/null 2>&1 || echo "Proceso no existía, continuando..."
+            cd $(remote_dir)
+            PORT=8080 AUTH_API_ADDRESS=http://127.0.0.1:8000 TODOS_API_ADDRESS=http://127.0.0.1:8082 pm2 start "npm start" --name frontend
+        displayName: 'Ejecutar en la VM'
