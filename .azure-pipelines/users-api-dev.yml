@@ -2,40 +2,59 @@ trigger:
   branches:
     include:
       - feature/*
+      - main
   paths:
     include:
       - users-api/**
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: ubuntu-latest
 
 variables:
-  vm_path: '/home/azureuser/microservice-app-example'
-  service_name: 'users-api'
-  jar_name: 'users-api-0.0.1-SNAPSHOT.jar'
+  service_dir: 'users-api'
+  artifact_name: 'users-api-0.0.1-SNAPSHOT.jar'
+  vm_ip: '172.172.172.182'
+  remote_dir: '~/microservice-app-example/users-api'
 
-steps:
-- task: SSH@0
-  inputs:
-    sshEndpoint: 'VM-DEV-CONNECTION'
-    runOptions: 'inline'
-    inline: |
-      echo "Entrando a la máquina virtual de desarrollo"
-      cd ${{ variables.vm_path }}
+stages:
+- stage: BuildAndDeploy
+  jobs:
+  - job: Build
+    displayName: Build users-api
+    steps:
+    - checkout: self
 
-      echo "Cambiando a la rama actual"
-      git fetch
-      CURRENT_BRANCH=$(echo $(Build.SourceBranchName))
-      git checkout $CURRENT_BRANCH || git checkout -b $CURRENT_BRANCH origin/$CURRENT_BRANCH
-      git pull origin $CURRENT_BRANCH
+    - script: |
+        cd $(service_dir)
+        chmod +x mvnw
+        ./mvnw clean install
+      displayName: Build with Maven
 
-      echo "Compilando Users API con Maven"
-      cd users-api
-      ./mvnw clean package -DskipTests=false
+    - publish: $(service_dir)/target/$(artifact_name)
+      artifact: users-jar
 
-      echo "Deteniendo proceso Java anterior si existe"
-      pkill -f ${{ variables.jar_name }} || echo "No había proceso corriendo"
+  - job: Deploy
+    displayName: Deploy to dev VM
+    dependsOn: Build
+    steps:
+    - download: current
+      artifact: users-jar
 
-      echo "Iniciando el nuevo .jar"
-      nohup java -jar target/${{ variables.jar_name }} > ../${{ variables.service_name }}.log 2>&1 &
-  displayName: 'Build y despliegue de Users API en VM DEV'
+    - task: CopyFilesOverSSH@0
+      inputs:
+        sshEndpoint: VM-DEV-CONNECTION
+        sourceFolder: $(Pipeline.Workspace)/users-jar
+        contents: $(artifact_name)
+        targetFolder: $(remote_dir)/target
+      displayName: Copiar JAR a la VM
+
+    - task: SSH@0
+      inputs:
+        sshEndpoint: VM-DEV-CONNECTION
+        runOptions: inline
+        inline: |
+          echo "⚙️ Desplegando users-api en la VM"
+          pm2 delete users-api || true
+          cd $(remote_dir)
+          JWT_SECRET=PRFT SERVER_PORT=8083 pm2 start "java -jar target/$(artifact_name)" --name users-api
+      displayName: Ejecutar en la VM
