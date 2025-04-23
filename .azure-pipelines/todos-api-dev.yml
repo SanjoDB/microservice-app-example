@@ -1,0 +1,57 @@
+trigger:
+  branches:
+    include:
+      - feature/*
+      - main
+  paths:
+    include:
+      - todos-api/**
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  service_dir: 'todos-api'
+  vm_ip: '172.172.172.182'
+  remote_dir: '~/microservice-app-example/todos-api'
+
+stages:
+- stage: BuildAndDeploy
+  jobs:
+  - job: BuildTodosApi
+    displayName: 'Build de TODOs API'
+    steps:
+      - checkout: self
+
+      - task: NodeTool@0
+        inputs:
+          versionSpec: '8.x'
+        displayName: 'Usar Node.js 8.x'
+
+      - script: |
+          cd todos-api
+          npm install
+        displayName: 'Instalar dependencias'
+
+  - job: Deploy
+    displayName: 'Deploy en VM dev'
+    dependsOn: BuildTodosApi
+    steps:
+      - task: CopyFilesOverSSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          sourceFolder: $(Build.SourcesDirectory)/todos-api
+          contents: '**'
+          targetFolder: $(remote_dir)
+        displayName: 'Copiar código a la VM'
+
+      - task: SSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          runOptions: inline
+          inline: |
+            echo "Desplegando todos-api en la VM"
+            pm2 delete todos-api || true
+            cd $(remote_dir)
+            JWT_SECRET=PRFT TODO_API_PORT=8082 REDIS_HOST=localhost REDIS_PORT=6379 REDIS_CHANNEL=todos pm2 start "npm start" --name todos-api
+        displayName: 'Ejecutar en la VM'
