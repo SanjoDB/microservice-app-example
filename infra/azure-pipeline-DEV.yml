@@ -139,7 +139,7 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         # Ejecutar el playbook de Ansible para instalar Docker
-        wsl bash -c "cd $(ansible_path) && \
+        cd $(ansible_path) && \
             export ANSIBLE_ROLES_PATH=./roles && \
             export ANSIBLE_HOST_KEY_CHECKING=False && \
             ansible-playbook -i $(inventory_path) playbooks/playbook.yml"
