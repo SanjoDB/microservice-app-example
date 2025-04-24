@@ -127,9 +127,10 @@ steps:
       inlineScript: |
         sudo apt-get update && sudo apt-get install -y sshpass
         echo "Clonando en VM con IP $(vmIp)"
-        sshpass -p "$(vmPassword)" ssh -o StrictHostKeyChecking=no azureuser@$(vmIp) \
-          "git clone https://github.com/SanjoDB/microservice-app-example /home/azureuser/microservice-app-example"
-    displayName: 'Clonar repositorio usando contraseña SSH'
+        sshpass -p "$(vmPassword)" ssh -o StrictHostKeyChecking=no azureuser@$(vmIp) "
+          rm -rf /home/azureuser/microservice-app-example &&
+          git clone https://github.com/SanjoDB/microservice-app-example /home/azureuser/microservice-app-example"
+    displayName: 'Clonar repositorio'
 
 
   - task: AzureCLI@2
@@ -138,9 +139,8 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
-        # Ejecutar el playbook de Ansible para instalar Docker
         cd $(ansible_path) && \
             export ANSIBLE_ROLES_PATH=./roles && \
             export ANSIBLE_HOST_KEY_CHECKING=False && \
             ansible-playbook -i $(inventory_path) playbooks/playbook.yml"
-    displayName: 'Ejecutar Ansible playbook para instalar Docker'
+    displayName: 'Ejecutar Ansible playbook'
