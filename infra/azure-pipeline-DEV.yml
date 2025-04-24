@@ -142,5 +142,5 @@ steps:
         cd $(ansible_path) && \
             export ANSIBLE_ROLES_PATH=./roles && \
             export ANSIBLE_HOST_KEY_CHECKING=False && \
-            ansible-playbook -i $(inventory_path) playbooks/playbook.yml"
+            ansible-playbook -i $(inventory_path) playbooks/playbook.yml
     displayName: 'Ejecutar Ansible playbook'
