@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - infra/dev  # Cambia a la rama que usas para despliegue
+      - infra/dev
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -13,17 +13,14 @@ variables:
   inventory_path: '$(Build.SourcesDirectory)/ansible/inventory/hosts.ini'
 
 steps:
-  # 1. Instalar Terraform
   - task: TerraformInstaller@0
     inputs:
       terraformVersion: '$(tf_version)'
     displayName: 'Instalar Terraform'
 
-  # 2. Verificar la versión de Terraform
   - script: terraform --version
     displayName: 'Verificar versión de Terraform'
 
-  # 3. Ejecutar Terraform para desplegar la infraestructura
   - task: AzureCLI@2
     inputs:
       azureSubscription: 'Kevin'
@@ -97,25 +94,16 @@ steps:
         terraform apply -auto-approve tfplan
     displayName: 'Importar si existen y desplegar infraestructura DEV con Terraform'
 
-  # 4. Asegurarse de que el directorio de Ansible existe y tiene permisos correctos
   - task: AzureCLI@2
     inputs:
       azureSubscription: 'Kevin'
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
-        # Asegurarse de que el directorio de Ansible existe y tiene permisos correctos
-        ssh -o StrictHostKeyChecking=no azureuser@$(publicIpAddress) "mkdir -p /home/azureuser/microservice-app-example/ansible && sudo chown azureuser:azureuser /home/azureuser/microservice-app-example/ansible"
-    displayName: 'Asegurar permisos del directorio de Ansible'
+        # Clonar el repositorio en la VM
+        ssh -o StrictHostKeyChecking=no azureuser@$(publicIpAddress) "git clone https://github.com/TU_USUARIO/microservice-app-example.git /home/azureuser/microservice-app-example"
+    displayName: 'Clonar repositorio en la VM'
 
-  # 5. Copiar archivos de Ansible a la VM
-  - task: CopyFiles@2
-    inputs:
-      SourceFolder: '$(Build.SourcesDirectory)/ansible'
-      TargetFolder: '/home/azureuser/microservice-app-example/ansible'
-    displayName: 'Copiar archivos de Ansible a la VM'
-
-  # 6. Ejecutar el playbook de Ansible para instalar Docker
   - task: AzureCLI@2
     inputs:
       azureSubscription: 'Kevin'
