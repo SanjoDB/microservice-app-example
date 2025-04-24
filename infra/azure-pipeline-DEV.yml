@@ -31,6 +31,7 @@ steps:
 
         RESOURCE_GROUP="rg-dev-microservices"
         SUBSCRIPTION_ID="9c34612c-d9bc-4f45-932e-44a22a08a99b"
+        NSG_NAME="nsg-dev"
         VNET_NAME="vnet-dev"
         SUBNET_NAME="subnet-dev"
         NIC_NAME="nic-dev"
@@ -63,6 +64,11 @@ steps:
         import_if_exists "Resource Group" \
           "azurerm_resource_group.rg" \
           "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP" \
+          "az group show --name $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID"
+
+        import_if_exists "NSG" \
+          "azurerm_network_security_group.nsg" \
+          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/networkSecurityGroups/$NSG_NAME" \
           "az group show --name $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID"
 
         import_if_exists "Virtual Network" \
