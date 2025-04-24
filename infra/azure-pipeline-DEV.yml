@@ -101,7 +101,9 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         # Clonar el repositorio en la VM
-        ssh -o StrictHostKeyChecking=no azureuser@$(publicIpAddress) "git clone https://github.com/TU_USUARIO/microservice-app-example.git /home/azureuser/microservice-app-example"
+        PUBLIC_IP=$(terraform output -raw vm_public_ip)
+        echo "##vso[task.setvariable variable=vmIp]$PUBLIC_IP"
+        ssh -o StrictHostKeyChecking=no azureuser@$(vmIp) "git clone https://github.com/TU_USUARIO/microservice-app-example.git /home/azureuser/microservice-app-example"
     displayName: 'Clonar repositorio en la VM'
 
   - task: AzureCLI@2
