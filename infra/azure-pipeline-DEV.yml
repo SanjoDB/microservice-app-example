@@ -106,7 +106,7 @@ steps:
     displayName: 'Importar si existen y desplegar infraestructura DEV con Terraform'
 
   - task: AzureCLI@2
-    name: GetVmIp
+    name: GetVmIpAndPassword
     inputs:
       azureSubscription: 'Kevin'
       scriptType: 'bash'
@@ -114,10 +114,10 @@ steps:
       inlineScript: |
         cd infra
         PUBLIC_IP=$(terraform output -raw vm_public_ip)
-        echo "IP pública obtenida: $PUBLIC_IP"
+        PASSWORD=$(terraform output -raw admin_password)
         echo "##vso[task.setvariable variable=vmIp]$PUBLIC_IP"
-    displayName: 'Obtener IP pública de la VM'
-
+        echo "##vso[task.setvariable variable=vmPassword]$PASSWORD"
+    displayName: 'Obtener IP pública y contraseña de la VM'
 
   - task: AzureCLI@2
     inputs:
@@ -125,9 +125,12 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
-        # Clonar el repositorio en la VM
-        ssh -o StrictHostKeyChecking=no azureuser@$(vmIp) "git clone https://github.com/SanjoDB/microservice-app-example /home/azureuser/microservice-app-example"
-    displayName: 'Clonar repositorio en la VM'
+        sudo apt-get update && sudo apt-get install -y sshpass
+        echo "Clonando en VM con IP $(vmIp)"
+        sshpass -p "$(vmPassword)" ssh -o StrictHostKeyChecking=no azureuser@$(vmIp) \
+          "git clone https://github.com/SanjoDB/microservice-app-example /home/azureuser/microservice-app-example"
+    displayName: 'Clonar repositorio usando contraseña SSH'
+
 
   - task: AzureCLI@2
     inputs:
