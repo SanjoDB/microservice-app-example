@@ -137,7 +137,7 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
-        sudo apt-get update && sudo apt-get install -y sshpass
+        sudo apt-get update && sudo apt-get install -y sshpass gnome-keyring
         echo "Ejecutando Ansible dentro de la VM en IP $(vmIp)"
         sshpass -p "$(vmPassword)" ssh -T -o StrictHostKeyChecking=no azureuser@$(vmIp) '
           sudo apt-get update &&
