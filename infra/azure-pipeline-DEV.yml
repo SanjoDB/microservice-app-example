@@ -140,9 +140,11 @@ steps:
         sudo apt-get update && sudo apt-get install -y sshpass
         echo "Ejecutando Ansible dentro de la VM en IP $(vmIp)"
         sshpass -p "$(vmPassword)" ssh -T -o StrictHostKeyChecking=no azureuser@$(vmIp) '
+          sudo apt-get update &&
+          sudo apt-get install -y ansible &&
           cd /home/azureuser/microservice-app-example/ansible &&
           export ANSIBLE_ROLES_PATH=./roles &&
           export ANSIBLE_HOST_KEY_CHECKING=False &&
           ansible-playbook -i inventory/hosts.ini playbooks/playbook.yml
         '
-    displayName: 'Ejecutar Ansible playbook'
+    displayName: 'Instalar Ansible y ejecutar playbook dentro de la VM'
