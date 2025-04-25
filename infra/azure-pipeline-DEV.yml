@@ -129,7 +129,7 @@ steps:
         echo "Clonando en VM con IP $(vmIp)"
         sshpass -p "$(vmPassword)" ssh -o StrictHostKeyChecking=no azureuser@$(vmIp) "
           rm -rf /home/azureuser/microservice-app-example &&
-          git clone https://github.com/SanjoDB/microservice-app-example /home/azureuser/microservice-app-example"
+          git clone --branch infra/dev https://github.com/SanjoDB/microservice-app-example /home/azureuser/microservice-app-example
     displayName: 'Clonar repositorio'
 
 
