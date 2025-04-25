@@ -1,5 +1,7 @@
-- hosts: dev-vm
+---
+- name: Desplegar entorno con Docker
+  hosts: azure_vm
   become: yes
   roles:
-    - role: docker_install
-    - role: docker_container
+    - docker_install
+    - docker_container
