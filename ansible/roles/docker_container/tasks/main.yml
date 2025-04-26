@@ -6,7 +6,7 @@
 
 - name: Verificar variables dockerhub_username
   debug:
-    msg: "Username: {{ dockerhub_username }}
+    msg: "Username: {{ dockerhub_username }}"
 
 - name: Docker login a DockerHub
   shell: |
