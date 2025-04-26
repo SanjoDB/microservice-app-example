@@ -7,10 +7,15 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  environment: dev
-  tf_version: '1.5.5'
-  ansible_path: '/home/azureuser/microservice-app-example/ansible'
-  inventory_path: '$(Build.SourcesDirectory)/ansible/inventory/hosts.ini'
+  - group: dockerhub-credentials
+  - name: environment
+    value: dev
+  - name: tf_version
+    value: '1.5.5'
+  - name: ansible_path
+    value: '/home/azureuser/microservice-app-example/ansible'
+  - name: inventory_path
+    value: '$(Build.SourcesDirectory)/ansible/inventory/hosts.ini'
 
 steps:
   - task: TerraformInstaller@0

@@ -2,6 +2,9 @@
 - name: Desplegar entorno con Docker
   hosts: azure_vm
   become: yes
+  vars:
+    dockerhub_username: "{{ lookup('env', 'DOCKERHUB_USERNAME') }}"
+    dockerhub_password: "{{ lookup('env', 'DOCKERHUB_PASSWORD') }}"
   roles:
     - docker_install
     - docker_container
