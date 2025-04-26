@@ -3,6 +3,7 @@
   hosts: azure_vm
   become: yes
   vars:
+    dockerhub_email: "{{ lookup('env', 'DOCKERHUB_EMAIL') }}"
     dockerhub_username: "{{ lookup('env', 'DOCKERHUB_USERNAME') }}"
     dockerhub_password: "{{ lookup('env', 'DOCKERHUB_PASSWORD') }}"
   roles:
