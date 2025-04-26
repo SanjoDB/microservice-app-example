@@ -67,7 +67,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   }
 
   provision_vm_agent  = true
-  custom_data         = base64encode(file("deploy.sh"))
+  
 }
 
 
