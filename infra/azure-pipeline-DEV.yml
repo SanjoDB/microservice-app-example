@@ -148,6 +148,8 @@ steps:
           sudo apt-get update &&
           sudo apt-get install -y ansible &&
           cd /home/azureuser/microservice-app-example/ansible &&
+          export DOCKERHUB_USERNAME=$(DOCKERHUB_USERNAME) &&
+          export DOCKERHUB_PASSWORD=$(DOCKERHUB_PASSWORD) &&
           export ANSIBLE_ROLES_PATH=./roles &&
           export ANSIBLE_HOST_KEY_CHECKING=False &&
           ansible-playbook -i inventory/hosts.ini playbooks/playbook.yml

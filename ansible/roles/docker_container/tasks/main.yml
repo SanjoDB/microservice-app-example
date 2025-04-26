@@ -4,7 +4,11 @@
     state: present
     update_cache: yes
 
-- name: Docker login a DockerHub manualmente
+- name: Verificar variables dockerhub_username
+  debug:
+    msg: "Username: {{ dockerhub_username }}
+
+- name: Docker login a DockerHub
   shell: echo "{{ dockerhub_password }}" | docker login --username "{{ dockerhub_username }}" --password-stdin
 
 - name: Levantar contenedores con Docker Compose
