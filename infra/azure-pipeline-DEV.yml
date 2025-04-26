@@ -38,11 +38,7 @@ steps:
         VM_NAME="dev-vm"
         PUBLIC_IP_NAME="public-ip-dev"
 
-        terraform init -reconfigure \
-          -backend-config="resource_group_name=rg-terraform-state" \
-          -backend-config="storage_account_name=terraformstate2644016" \
-          -backend-config="container_name=tfstate" \
-          -backend-config="key=dev.terraform.tfstate"
+        terraform init
 
         # Función para importar recursos si existen
         import_if_exists () {
