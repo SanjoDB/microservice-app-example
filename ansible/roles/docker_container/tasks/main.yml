@@ -10,11 +10,11 @@
 
 - name: Docker login a DockerHub
   shell: |
+    mkdir -p ~/.docker
+    echo '{"credsStore":""}' > ~/.docker/config.json
     echo '{{ dockerhub_password }}' | docker login --username '{{ dockerhub_username }}' --password-stdin
-
 
 - name: Levantar contenedores con Docker Compose
   shell: docker compose up -d
   args:
     chdir: /home/azureuser/microservice-app-example
-
