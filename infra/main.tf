@@ -106,15 +106,6 @@ resource "azurerm_network_interface_security_group_association" "nsg_assoc" {
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
-terraform {
-  backend "azurerm" {
-    resource_group_name  = "devops-workshop"
-    storage_account_name = "tfstatestorage123"
-    container_name       = "tfstateDO"
-    key                  = "terraform.tfstate"
-  }
-}
-
 output "vm_ip_address" {
   description = "Dirección IP privada de la VM"
   value       = azurerm_network_interface.nic.private_ip_address
