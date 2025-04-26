@@ -4,6 +4,7 @@
       - apt-transport-https
       - ca-certificates
       - curl
+      - gnupg-agent
       - software-properties-common
     state: present
     update_cache: yes
@@ -13,22 +14,22 @@
     url: https://download.docker.com/linux/ubuntu/gpg
     state: present
 
-- name: Agregar el repositorio de Docker
+- name: Agregar el repositorio oficial de Docker
   apt_repository:
     repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
     state: present
 
-- name: Instalar Docker CE
+- name: Actualizar cache de paquetes
   apt:
-    name: docker-ce
-    state: present
     update_cache: yes
 
-- name: Instalar Docker Compose
+- name: Instalar Docker Engine (CE), CLI y containerd
   apt:
-    name: docker-compose
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
     state: present
-    update_cache: yes
 
 - name: Habilitar Docker para iniciar al arranque
   systemd:
@@ -36,7 +37,7 @@
     enabled: yes
     state: started
 
-- name: Agregar usuario al grupo Docker
+- name: Agregar usuario azureuser al grupo docker
   user:
     name: azureuser
     groups: docker
