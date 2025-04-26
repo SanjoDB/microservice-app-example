@@ -8,11 +8,14 @@
   debug:
     msg: "Username: {{ dockerhub_username }}"
 
-- name: Docker login a DockerHub
+- name: Crear carpeta ~/.docker y desactivar credStore
   shell: |
     mkdir -p ~/.docker
     echo '{"credsStore":""}' > ~/.docker/config.json
-    echo '{{ dockerhub_password }}' | docker login --username '{{ dockerhub_username }}' --password-stdin
+
+- name: Docker login a DockerHub
+  shell: |
+    echo '{{ dockerhub_password }}' | docker --config ~/.docker login --username '{{ dockerhub_username }}' --password-stdin
 
 - name: Levantar contenedores con Docker Compose
   shell: docker compose up -d
