@@ -9,7 +9,7 @@
     msg: "Username: {{ dockerhub_username }}
 
 - name: Docker login a DockerHub
-  shell: echo "{{ dockerhub_password }}" | docker login --username "{{ dockerhub_username }}" --password-stdin
+  shell: "echo '{{ dockerhub_password }}' | docker login --username '{{ dockerhub_username }}' --password-stdin"
 
 - name: Levantar contenedores con Docker Compose
   shell: docker compose up -d
