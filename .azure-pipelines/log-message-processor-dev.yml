@@ -2,7 +2,7 @@ trigger:
   branches:
     include:
       - feature/*
-      - main
+      - master
   paths:
     include:
       - log-message-processor/**
