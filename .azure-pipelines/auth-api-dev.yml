@@ -37,6 +37,7 @@ stages:
           sshEndpoint: VM-DEV-CONNECTION
           runOptions: inline
           inline: |
+            set +e
             echo "Reconstruyendo y levantando auth-api vía Docker Compose"
             cd $(remote_base_dir)
             docker-compose build auth-api
