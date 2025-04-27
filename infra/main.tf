@@ -1,6 +1,5 @@
 provider "azurerm" {
   features {}
-  subscription_id = var.subscription_id
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -9,77 +8,76 @@ resource "azurerm_resource_group" "rg" {
 }
 
 resource "azurerm_virtual_network" "vnet" {
-  name                = "vnet-dev"
-  address_space       = ["10.0.0.0/16"]
+  name                = var.vnet_name
+  address_space       = var.vnet_address_space
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 }
 
 resource "azurerm_subnet" "subnet" {
-  name                 = "subnet-dev"
+  name                 = var.subnet_name
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
+  address_prefixes     = var.subnet_address_prefixes
 }
 
 resource "azurerm_public_ip" "public_ip" {
-  name                = "public-ip-dev"
-  location            = azurerm_resource_group.rg.location
+  name                = var.public_ip_name
+  location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
+  allocation_method   = var.public_ip_allocation_method
+  sku                 = var.public_ip_sku
 }
 
 resource "azurerm_network_interface" "nic" {
-  name                = "nic-dev"
-  location            = azurerm_resource_group.rg.location
+  name                = var.nic_name
+  location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
 
   ip_configuration {
-    name                          = "internal"
+    name                          = "ipconfig1"
     subnet_id                     = azurerm_subnet.subnet.id
     private_ip_address_allocation = "Static"
-    private_ip_address            = "10.0.1.10"
+    private_ip_address            = "10.0.1.4"
     public_ip_address_id          = azurerm_public_ip.public_ip.id
   }
 }
 
 resource "azurerm_linux_virtual_machine" "vm" {
-  name                = "dev-vm"
+  name                = var.vm_name
   resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  size                = "Standard_DS1_v2"
+  location            = var.location
+  size                = var.vm_size
   admin_username      = var.admin_username
   admin_password      = var.admin_password
+  disable_password_authentication = false
   network_interface_ids = [
     azurerm_network_interface.nic.id,
   ]
 
   os_disk {
     caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
+    storage_account_type = var.storage_account_type
   }
 
   source_image_reference {
-    publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "18.04-LTS"
-    version   = "latest"
+    publisher = var.image_publisher
+    offer     = var.image_offer
+    sku       = var.image_sku
+    version   = var.image_version
   }
 
-  provision_vm_agent  = true
-  disable_password_authentication = false
-  custom_data        = base64encode(file("deploy.sh"))
+    provision_vm_agent = true
+    custom_data        = base64encode(file("config.sh"))
 }
 
-
 resource "azurerm_network_security_group" "nsg" {
-  name                = "nsg-dev"
-  location            = azurerm_resource_group.rg.location
+  name                = var.nsg_name
+  location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
 
   security_rule {
-    name                       = "AllowSSH"
+    name                       = "Allow-SSH"
     priority                   = 1001
     direction                  = "Inbound"
     access                     = "Allow"
@@ -91,13 +89,109 @@ resource "azurerm_network_security_group" "nsg" {
   }
 
   security_rule {
-    name                       = "AllowWebPorts"
+    name                       = "port-8000"
     priority                   = 1002
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = ["8000", "8080", "8081", "8082", "8083"]
+    destination_port_range     = "8000"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "port-8081"
+    priority                   = 1003
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "8081"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "port-8082"
+    priority                   = 1004
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "8082"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+    security_rule {
+    name                       = "port-3000"
+    priority                   = 1006
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3000"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+    security_rule {
+    name                       = "port-9090"
+    priority                   = 1007
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "9090"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+    security_rule {
+    name                       = "port-9411"
+    priority                   = 1008
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "9411"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "port-8083"
+    priority                   = 1005
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "8083"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+    security_rule {
+    name                       = "port-80"
+    priority                   = 1009
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "port-53"
+    priority                   = 1010
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "53"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
@@ -108,18 +202,11 @@ resource "azurerm_network_interface_security_group_association" "nsg_assoc" {
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
-output "vm_ip_address" {
-  description = "Dirección IP privada de la VM"
-  value       = azurerm_network_interface.nic.private_ip_address
-}
-
-output "vm_public_ip" {
-  description = "Dirección IP pública de la VM"
-  value       = azurerm_public_ip.public_ip.ip_address
-}
-
-output "admin_password" {
-  description = "Contraseña de administrador de la VM"
-  value       = var.admin_password
-  sensitive   = true
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "devops-workshop"
+    storage_account_name = "tfstatestorage123lp"
+    container_name       = "tfstatelp"
+    key                  = "terraform.tfstate"
+  }
 }
