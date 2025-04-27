@@ -26,6 +26,13 @@ stages:
             dockerVersion: '20.10.7'
             
         - script: |
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
+          displayName: 'Instalar Docker Compose'
+
+        
+        - script: |
             echo "Validando compilación de todos los servicios..."
             
             # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
