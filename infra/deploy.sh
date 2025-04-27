@@ -5,7 +5,7 @@ sudo apt-get install -y docker.io docker-compose git
 sudo usermod -aG docker azureuser
 
 cd /home/azureuser
-git clone https://github.com/SanjoDB/microservice-app-example
+git clone https://github.com/SanjoDB/microservice-app-example -branch infra/dev
 cd microservice-app-example
 
 sudo docker-compose -f docker-compose.yml up -d --build
