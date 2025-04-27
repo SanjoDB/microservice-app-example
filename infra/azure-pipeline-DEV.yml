@@ -1,35 +1,27 @@
-trigger:
-  branches:
-    include:
-      - infra/dev
-
-pool:
-  vmImage: 'ubuntu-latest'
-
-variables:
-  - name: environment
-    value: dev
-  - name: tf_version
-    value: '1.5.5'
-  - group: terraform-credentials
-
-steps:
-- task: AzureCLI@2
-  inputs:
-    azureSubscription: 'Kevin'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
-      export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
-      export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
-      export ARM_TENANT_ID=$(ARM_TENANT_ID)
-
-      cd infra
-      terraform init -reconfigure \
-        -backend-config="resource_group_name=rg-terraform-state" \
-        -backend-config="storage_account_name=terraformstate2644016" \
-        -backend-config="container_name=tfstate" \
-        -backend-config="key=terraform.tfstate"
-      terraform plan -var-file="terraform.tfvars" -out=tfplan
-      terraform apply -auto-approve tfplan
+name: Despliegue de infraestructura en Azure
+on:
+  push:
+    paths:
+      - 'infra/dev'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ ARM_TENANT_ID }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+      
+      - name: Terraform Init
+        run: terraform init
+        working-directory: infra
+      
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        working-directory: infra
