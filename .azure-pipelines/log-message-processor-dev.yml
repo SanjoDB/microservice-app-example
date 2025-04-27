@@ -41,7 +41,7 @@ stages:
             cd $(remote_base_dir)
             
             # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
-            docker-compose build log-message-processor > build_output.log 2>&1
+            docker-compose build log-processor > build_output.log 2>&1
             BUILD_STATUS=$?
 
             if [ $BUILD_STATUS -ne 0 ]; then
@@ -55,7 +55,7 @@ stages:
 
             echo "Levantando contenedor log-message-processor..."
             # Forzar recreación del contenedor con --force-recreate y redireccionar salida
-            docker-compose up -d --force-recreate log-message-processor > deploy_output.log 2>&1
+            docker-compose up -d --force-recreate log-processor > deploy_output.log 2>&1
             DEPLOY_STATUS=$?
             
             if [ $DEPLOY_STATUS -ne 0 ]; then
@@ -65,7 +65,7 @@ stages:
             fi
             
             # Verificar que el contenedor esté ejecutándose
-            CONTAINER_STATUS=$(docker-compose ps -q log-message-processor | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
+            CONTAINER_STATUS=$(docker-compose ps -q log-processor | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
             if [ "$CONTAINER_STATUS" != "true" ]; then
               echo "##vso[task.logissue type=error]El contenedor log-message-processor no está en ejecución."
               exit 1
