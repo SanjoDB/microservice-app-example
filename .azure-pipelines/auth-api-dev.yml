@@ -37,7 +37,6 @@ stages:
           sshEndpoint: VM-DEV-CONNECTION
           runOptions: inline
           inline: |
-            set +e
             echo "Reconstruyendo y levantando auth-api vía Docker Compose"
             cd $(remote_base_dir)
             
@@ -73,5 +72,4 @@ stages:
             else
               echo "##vso[task.logissue type=warning]Contenedor auth-api desplegado correctamente."
             fi
-            exit 0
         displayName: 'Reconstruir y levantar contenedor auth-api'
