@@ -12,8 +12,9 @@ pool:
 
 variables:
   service_dir: 'log-message-processor'
-  vm_ip: '172.172.172.182'
-  remote_dir: '~/microservice-app-example/log-message-processor'
+  vm_ip: '172.172.175.246'
+  remote_base_dir: '~/microservice-app-example'
+  remote_service_dir: '~/microservice-app-example/log-message-processor'
 
 stages:
 - stage: BuildAndDeploy
@@ -23,26 +24,52 @@ stages:
     steps:
       - checkout: self
 
-      - script: |
-          cd $(service_dir)
-          pip3 install -r requirements.txt --user
-        displayName: 'Instalar dependencias con pip3'
-
       - task: CopyFilesOverSSH@0
         inputs:
           sshEndpoint: VM-DEV-CONNECTION
-          sourceFolder: $(Build.SourcesDirectory)/$(service_dir)
+          sourceFolder: $(service_dir)
           contents: '**'
-          targetFolder: $(remote_dir)
-        displayName: 'Copiar archivos a la VM'
+          targetFolder: $(remote_service_dir)
+        displayName: 'Copiar carpeta actualizada a la VM'
 
       - task: SSH@0
         inputs:
           sshEndpoint: VM-DEV-CONNECTION
           runOptions: inline
           inline: |
-            echo "Desplegando log-message-processor en la VM"
-            pm2 delete log-processor >/dev/null 2>&1 || echo "Proceso no existía, continuando..."
-            cd $(remote_dir)
-            REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_CHANNEL=log_channel pm2 start "python3 main.py" --name log-processor
-        displayName: 'Ejecutar en la VM'
+            echo "Reconstruyendo y levantando log-message-processor vía Docker Compose"
+            cd $(remote_base_dir)
+            
+            # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
+            docker-compose build log-message-processor > build_output.log 2>&1
+            BUILD_STATUS=$?
+
+            if [ $BUILD_STATUS -ne 0 ]; then
+              cat build_output.log
+              echo "##vso[task.logissue type=error]Error en la construcción del log-message-processor."
+              exit 1
+            else
+              # Mostrar el resultado de la construcción como mensaje informativo
+              echo "##vso[task.logissue type=warning]Build de log-message-processor completado exitosamente."
+            fi
+
+            echo "Levantando contenedor log-message-processor..."
+            # Forzar recreación del contenedor con --force-recreate y redireccionar salida
+            docker-compose up -d --force-recreate log-message-processor > deploy_output.log 2>&1
+            DEPLOY_STATUS=$?
+            
+            if [ $DEPLOY_STATUS -ne 0 ]; then
+              cat deploy_output.log
+              echo "##vso[task.logissue type=error]Error al desplegar log-message-processor."
+              exit 1
+            fi
+            
+            # Verificar que el contenedor esté ejecutándose
+            CONTAINER_STATUS=$(docker-compose ps -q log-message-processor | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
+            if [ "$CONTAINER_STATUS" != "true" ]; then
+              echo "##vso[task.logissue type=error]El contenedor log-message-processor no está en ejecución."
+              exit 1
+            else
+              echo "##vso[task.logissue type=warning]Contenedor log-message-processor desplegado correctamente."
+            fi
+        displayName: 'Reconstruir y levantar contenedor log-message-processor'
