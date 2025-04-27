@@ -1,38 +1,62 @@
 trigger:
-  paths:
+  branches:
     include:
-      - 'infra/dev'
+      - infra/dev
+
+pool:
+  vmImage: 'ubuntu-latest'
 
 variables:
-  - group: terraform-credentials
+  environment: dev
+  tf_version: '1.5.5'
 
 steps:
-- checkout: self
+  - task: TerraformInstaller@0
+    inputs:
+      terraformVersion: '$(tf_version)'
+    displayName: 'Instalar Terraform'
 
-- task: TerraformInstaller@0
-  inputs:
-    terraformVersion: '1.5.5'
+  - script: terraform --version
+    displayName: 'Verificar versión de Terraform'
 
-- script: |
-    export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
-    export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
-    export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
-    export ARM_TENANT_ID=$(ARM_TENANT_ID)
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+    displayName: 'Usar Python para Azure CLI'
 
-    terraform init -reconfigure \
-      -backend-config="resource_group_name=rg-terraform-state" \
-      -backend-config="storage_account_name=terraformstate2644016" \
-      -backend-config="container_name=tfstate" \
-      -backend-config="key=staging.terraform.tfstate"
-  workingDirectory: $(System.DefaultWorkingDirectory)/infra
-  displayName: 'Terraform Init'
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        cd infra
 
-- script: |
-    terraform plan -var-file="terraform-staging.tfvars" -out=tfplan
-  workingDirectory: $(System.DefaultWorkingDirectory)/infra
-  displayName: 'Terraform Plan'
+        terraform init -reconfigure \
+          -backend-config="resource_group_name=rg-terraform-state" \
+          -backend-config="storage_account_name=terraformstate2644016" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=dev.terraform.tfstate"
+    displayName: 'Terraform Init'
 
-- script: |
-    terraform apply -auto-approve tfplan
-  workingDirectory: $(System.DefaultWorkingDirectory)/infra
-  displayName: 'Terraform Apply'
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        cd infra
+
+        terraform plan -var-file="terraform-dev.tfvars" -out=tfplan
+    displayName: 'Terraform Plan'
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        cd infra
+
+        terraform apply -auto-approve tfplan
+    displayName: 'Terraform Apply'
