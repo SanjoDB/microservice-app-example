@@ -1,5 +1,5 @@
 trigger:
-  paths:
+  branches:
     include:
       - infra/dev
 
@@ -7,26 +7,29 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  ARM_CLIENT_ID: $(ARM_CLIENT_ID)
-  ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
-  ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
-  ARM_TENANT_ID: $(ARM_TENANT_ID)
+  - group: terraform-credentials
 
 steps:
   - task: Checkout@1
-    displayName: 'Checkout code'
+    displayName: 'Checkout del código'
 
-  - task: UseTerraform@0
-    displayName: 'Setup Terraform'
+  - task: TerraformInstaller@1
+    displayName: 'Instalar Terraform'
     inputs:
-      terraformVersion: 'latest'
+      terraformVersion: '1.5.5'
 
   - script: |
-      terraform init
-    displayName: 'Terraform Init'
+      echo "Inicializando Terraform..."
+      terraform init -reconfigure \
+        -backend-config="resource_group_name=rg-terraform-state" \
+        -backend-config="storage_account_name=terraformstate2644016" \
+        -backend-config="container_name=tfstate" \
+        -backend-config="key=terraform.tfstate"
     workingDirectory: infra
+    displayName: 'Inicializar Terraform'
 
   - script: |
+      echo "Aplicando Terraform..."
       terraform apply -auto-approve
-    displayName: 'Terraform Apply'
     workingDirectory: infra
+    displayName: 'Aplicar infraestructura con Terraform'
