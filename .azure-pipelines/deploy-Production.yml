@@ -1,0 +1,76 @@
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - '**/*'
+
+pr: none
+
+variables:
+  vm_ip: '20.172.180.248'
+  remote_base_dir: '~/microservice-app-example'
+
+stages:
+- stage: DeployToProduction
+  displayName: "Desplegar a producción desde master"
+  jobs:
+    - job: DeployToProd
+      displayName: "Actualizar código y compilar todos los servicios"
+      steps:
+        - checkout: self
+
+        - task: CopyFilesOverSSH@0
+          inputs:
+            sshEndpoint: VM-PROD-CONNECTION
+            sourceFolder: $(Build.SourcesDirectory)
+            contents: '**'
+            targetFolder: $(remote_base_dir)
+          displayName: 'Copiar repositorio completo a la VM'
+        
+        - task: SSH@0
+          inputs:
+            sshEndpoint: VM-PROD-CONNECTION
+            runOptions: inline
+            inline: |
+              echo "Reconstruyendo y levantando todos los servicios en producción"
+              cd $(remote_base_dir)
+              
+              # Redirigir la salida de docker-compose a un archivo
+              docker-compose build > build_output.log 2>&1
+              BUILD_STATUS=$?
+
+              if [ $BUILD_STATUS -ne 0 ]; then
+                cat build_output.log
+                echo "##vso[task.logissue type=error]Error en la construcción de los servicios."
+                exit 1
+              else
+                echo "##vso[task.logissue type=warning]Build de todos los servicios completado exitosamente."
+              fi
+
+              echo "Levantando todos los contenedores..."
+              docker-compose up -d --force-recreate > deploy_output.log 2>&1
+              DEPLOY_STATUS=$?
+              
+              if [ $DEPLOY_STATUS -ne 0 ]; then
+                cat deploy_output.log
+                echo "##vso[task.logissue type=error]Error al desplegar los servicios."
+                exit 1
+              fi
+              
+              # Verificar que los contenedores críticos estén ejecutándose
+              CRITICAL_SERVICES=("users-api" "auth-api" "todos-api" "frontend")
+              
+              for SERVICE in "${CRITICAL_SERVICES[@]}"; do
+                CONTAINER_STATUS=$(docker-compose ps -q $SERVICE | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
+                if [ "$CONTAINER_STATUS" != "true" ]; then
+                  echo "##vso[task.logissue type=error]El contenedor $SERVICE no está en ejecución."
+                  exit 1
+                else
+                  echo "##vso[task.logissue type=warning]Contenedor $SERVICE desplegado correctamente."
+                fi
+              done
+              
+              echo "##vso[task.logissue type=warning]Todos los servicios desplegados correctamente en producción."
+          displayName: 'Reconstruir y levantar todos los contenedores'

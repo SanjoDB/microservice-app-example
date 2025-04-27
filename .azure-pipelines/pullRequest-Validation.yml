@@ -1,0 +1,43 @@
+trigger: none
+
+pr:
+  branches:
+    include:
+      - master
+      - prod
+  paths:
+    include:
+      - '**/*'
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+- stage: ValidatePR
+  displayName: "Validar Pull Request"
+  jobs:
+    - job: BuildValidation
+      displayName: "Validar compilación de todos los servicios"
+      steps:
+        - checkout: self
+        
+        - task: DockerInstaller@0
+          inputs:
+            dockerVersion: '20.10.7'
+            
+        - script: |
+            echo "Validando compilación de todos los servicios..."
+            
+            # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
+            docker-compose build > build_output.log 2>&1
+            BUILD_STATUS=$?
+            
+            cat build_output.log
+            
+            if [ $BUILD_STATUS -ne 0 ]; then
+              echo "##vso[task.logissue type=error]Error en la compilación de uno o más servicios. Revisa los Dockerfiles y dependencias."
+              exit 1
+            else
+              echo "##vso[task.logissue type=warning]¡Todos los servicios compilan correctamente!"
+            fi
+          displayName: 'Validar compilación con Docker Compose'
