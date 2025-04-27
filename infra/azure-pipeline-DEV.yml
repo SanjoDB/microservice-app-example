@@ -30,74 +30,12 @@ steps:
       inlineScript: |
         cd infra
         
+        echo "Inicializando Terraform..."
         terraform init -reconfigure
 
-        RESOURCE_GROUP="rg-dev-microservices"
-        SUBSCRIPTION_ID="9c34612c-d9bc-4f45-932e-44a22a08a99b"
-        NSG_NAME="nsg-dev"
-        VNET_NAME="vnet-dev"
-        SUBNET_NAME="subnet-dev"
-        NIC_NAME="nic-dev"
-        VM_NAME="dev-vm"
-        PUBLIC_IP_NAME="public-ip-dev"
-
-        # Función para importar recursos si existen
-        import_if_exists () {
-          RESOURCE_TYPE=$1
-          BLOCK_NAME=$2
-          RESOURCE_ID=$3
-          CHECK_COMMAND=$4
-
-          echo "Verificando $RESOURCE_TYPE..."
-          if eval "$CHECK_COMMAND" >/dev/null 2>&1; then
-            echo "$RESOURCE_TYPE existe. Importando..."
-            terraform import -var-file="terraform.tfvars" "$BLOCK_NAME" "$RESOURCE_ID"
-          else
-            echo "$RESOURCE_TYPE no existe. Saltando importación."
-          fi
-        }
-
-        # Importaciones
-        import_if_exists "Resource Group" \
-          "azurerm_resource_group.rg" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP" \
-          "az group show --name $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "NSG" \
-          "azurerm_network_security_group.nsg" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/networkSecurityGroups/$NSG_NAME" \
-          "az group show --name $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "Virtual Network" \
-          "azurerm_virtual_network.vnet" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME" \
-          "az network vnet show --resource-group $RESOURCE_GROUP --name $VNET_NAME --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "Subnet" \
-          "azurerm_subnet.subnet" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME/subnets/$SUBNET_NAME" \
-          "az network vnet subnet show --resource-group $RESOURCE_GROUP --vnet-name $VNET_NAME --name $SUBNET_NAME --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "NIC" \
-          "azurerm_network_interface.nic" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/networkInterfaces/$NIC_NAME" \
-          "az network nic show --resource-group $RESOURCE_GROUP --name $NIC_NAME --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "NIC-NSG Association" \
-          "azurerm_network_interface_security_group_association.nsg_assoc" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/networkInterfaces/$NIC_NAME|/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/networkSecurityGroups/$NSG_NAME" \
-          "az network nic show --resource-group $RESOURCE_GROUP --name $NIC_NAME --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "VM" \
-          "azurerm_linux_virtual_machine.vm" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachines/$VM_NAME" \
-          "az vm show --resource-group $RESOURCE_GROUP --name $VM_NAME --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "Public IP" \
-          "azurerm_public_ip.public_ip" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/publicIPAddresses/$PUBLIC_IP_NAME" \
-          "az network public-ip show --resource-group $RESOURCE_GROUP --name $PUBLIC_IP_NAME --subscription $SUBSCRIPTION_ID"
-
+        echo "Haciendo plan de Terraform..."
         terraform plan -var-file="terraform.tfvars" -out=tfplan
+
+        echo "Aplicando Terraform plan..."
         terraform apply -auto-approve tfplan
-    displayName: 'Importar si existen y desplegar infraestructura DEV con Terraform'
+    displayName: 'Inicializar y desplegar infraestructura DEV'
