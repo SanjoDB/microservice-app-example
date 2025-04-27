@@ -1,27 +1,33 @@
-name: Despliegue de infraestructura en Azure
-on:
-  push:
-    paths:
-      - 'infra/dev'
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    env:
-      ARM_CLIENT_ID: ${{ ARM_CLIENT_ID }}
-      ARM_CLIENT_SECRET: ${{ ARM_CLIENT_SECRET }}
-      ARM_SUBSCRIPTION_ID: ${{ ARM_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID: ${{ ARM_TENANT_ID }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-      
-      - name: Terraform Init
-        run: terraform init
-        working-directory: infra
-      
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
-        working-directory: infra
+trigger:
+  branches:
+    include:
+      - infra/dev
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: terraform-credentials
+
+steps:
+  - task: Checkout@1
+    displayName: 'Checkout código'
+  
+  - task: TerraformInstaller@1
+    inputs:
+      terraformVersion: '1.5.5'
+    displayName: 'Instalar Terraform'
+
+  - script: |
+      terraform init -reconfigure \
+        -backend-config="resource_group_name=rg-terraform-state" \
+        -backend-config="storage_account_name=terraformstate2644016" \
+        -backend-config="container_name=tfstate" \
+        -backend-config="key=terraform.tfstate"
+    workingDirectory: infra
+    displayName: 'Inicializar Terraform'
+
+  - script: |
+      terraform apply -auto-approve
+    workingDirectory: infra
+    displayName: 'Aplicar cambios con Terraform'
