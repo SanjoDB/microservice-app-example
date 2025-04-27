@@ -30,12 +30,16 @@ steps:
       inlineScript: |
         cd infra
         
-        echo "Inicializando Terraform..."
-        terraform init -reconfigure
+        echo "Inicializando Terraform backend..."
+        terraform init -reconfigure \
+          -backend-config="resource_group_name=rg-terraform-state" \
+          -backend-config="storage_account_name=terraformstate2644016" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=terraform.tfstate"
 
-        echo "Haciendo plan de Terraform..."
+        echo "Haciendo Terraform plan..."
         terraform plan -var-file="terraform.tfvars" -out=tfplan
 
         echo "Aplicando Terraform plan..."
         terraform apply -auto-approve tfplan
-    displayName: 'Inicializar y desplegar infraestructura DEV'
+    displayName: 'Inicializar, planificar y aplicar infraestructura DEV'
