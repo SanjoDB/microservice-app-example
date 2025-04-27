@@ -68,7 +68,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   }
 
     provision_vm_agent = true
-    custom_data        = base64encode(file("config.sh"))
+    custom_data        = base64encode(file("deploy.sh"))
 }
 
 resource "azurerm_network_security_group" "nsg" {
@@ -204,9 +204,9 @@ resource "azurerm_network_interface_security_group_association" "nsg_assoc" {
 
 terraform {
   backend "azurerm" {
-    resource_group_name  = "rg-terraform-state"
-    storage_account_name = "terraformstate2644016"
-    container_name       = "tfstate"
+    resource_group_name  = "rg-terraform-state-backend"
+    storage_account_name = "terraformstate2644"
+    container_name       = "tfstate-back"
     key                  = "terraform.tfstate"
   }
 }
