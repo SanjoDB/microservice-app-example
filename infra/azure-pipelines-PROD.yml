@@ -7,14 +7,20 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  environment: production
-  tf_version: '1.5.5'
+  - group: terraform-credentials
+  - name: environment
+    value: production
+  - name: tf_version
+    value: '1.5.5'
 
 steps:
   - task: TerraformInstaller@0
     inputs:
       terraformVersion: '$(tf_version)'
     displayName: 'Instalar Terraform'
+
+  - script: terraform --version
+    displayName: 'Verificar versión de Terraform'
 
   - task: UsePythonVersion@0
     inputs:
@@ -27,62 +33,48 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
+        export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(ARM_TENANT_ID)
+
         cd infra
 
-        RESOURCE_GROUP="rg-prod-microservices"
-        SUBSCRIPTION_ID="9c34612c-d9bc-4f45-932e-44a22a08a99b"
-        VNET_NAME="vnet-prod"
-        SUBNET_NAME="subnet-prod"
-        NIC_NAME="nic-prod"
-        VM_NAME="prod-vm"
-
         terraform init -reconfigure \
-          -backend-config="resource_group_name=rg-terraform-state" \
-          -backend-config="storage_account_name=terraformstate2644016" \
-          -backend-config="container_name=tfstate" \
-          -backend-config="key=prod.terraform.tfstate"
+          -backend-config="resource_group_name=rg-terraform-state-prod" \
+          -backend-config="storage_account_name=terraformstate264402" \
+          -backend-config="container_name=tfstate-back" \
+          -backend-config="terraform.tfstate"
+    displayName: 'Terraform Init'
 
-        # Función para importar recursos si existen
-        import_if_exists () {
-          RESOURCE_TYPE=$1
-          BLOCK_NAME=$2
-          RESOURCE_ID=$3
-          CHECK_COMMAND=$4
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(ARM_TENANT_ID)
 
-          echo "Verificando $RESOURCE_TYPE..."
-          if eval "$CHECK_COMMAND" >/dev/null 2>&1; then
-            echo "$RESOURCE_TYPE existe. Importando..."
-            terraform import -var-file="terraform.prod.tfvars" "$BLOCK_NAME" "$RESOURCE_ID"
-          else
-            echo "$RESOURCE_TYPE no existe. Saltando importación."
-          fi
-        }
+        cd infra
 
-        import_if_exists "Resource Group" \
-          "azurerm_resource_group.rg" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP" \
-          "az group show --name $RESOURCE_GROUP --subscription $SUBSCRIPTION_ID"
+        terraform plan -var-file="terraform-prod.tfvars" -out=tfplan
+    displayName: 'Terraform Plan'
 
-        import_if_exists "Virtual Network" \
-          "azurerm_virtual_network.vnet" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME" \
-          "az network vnet show --resource-group $RESOURCE_GROUP --name $VNET_NAME --subscription $SUBSCRIPTION_ID"
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Kevin'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(ARM_TENANT_ID)
 
-        import_if_exists "Subnet" \
-          "azurerm_subnet.subnet" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/virtualNetworks/$VNET_NAME/subnets/$SUBNET_NAME" \
-          "az network vnet subnet show --resource-group $RESOURCE_GROUP --vnet-name $VNET_NAME --name $SUBNET_NAME --subscription $SUBSCRIPTION_ID"
+        cd infra
 
-        import_if_exists "NIC" \
-          "azurerm_network_interface.nic" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Network/networkInterfaces/$NIC_NAME" \
-          "az network nic show --resource-group $RESOURCE_GROUP --name $NIC_NAME --subscription $SUBSCRIPTION_ID"
-
-        import_if_exists "VM" \
-          "azurerm_linux_virtual_machine.vm" \
-          "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachines/$VM_NAME" \
-          "az vm show --resource-group $RESOURCE_GROUP --name $VM_NAME --subscription $SUBSCRIPTION_ID"
-
-        terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
-    displayName: 'Importar si existen y desplegar infraestructura PRODUCTION con Terraform'
+    displayName: 'Terraform Apply'
