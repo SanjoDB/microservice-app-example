@@ -11,7 +11,6 @@ services:
       - "8000:8000"
     depends_on:
       - users-api
-      - cache
     restart: on-failure
     healthcheck:
       test: ["CMD", "curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"username":"admin","password":"admin"}', "http://localhost:8000/login"]
@@ -32,8 +31,6 @@ services:
       - CACHE_ENABLED=true
     ports:
       - "8083:8083"
-    depends_on:
-      - cache
     restart: on-failure
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/users"]
