@@ -18,7 +18,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - backend
+      - msa-network
 
   users-api:
     build: ./users-api
@@ -38,7 +38,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - backend
+      - msa-network
 
   todos-api:
     build: ./todos-api
