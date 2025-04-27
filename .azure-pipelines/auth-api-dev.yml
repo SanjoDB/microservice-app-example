@@ -50,6 +50,16 @@ stages:
             fi
 
             echo "Levantando contenedor auth-api..."
-            docker-compose up -d auth-api
+            # Forzar recreación del contenedor con --force-recreate
+            docker-compose up -d --force-recreate auth-api
+            
+            # Verificar que el contenedor esté ejecutándose
+            CONTAINER_STATUS=$(docker-compose ps -q auth-api | xargs docker inspect -f '{{.State.Running}}')
+            if [ "$CONTAINER_STATUS" != "true" ]; then
+              echo "##vso[task.logissue type=error]El contenedor auth-api no está en ejecución."
+              exit 1
+            else
+              echo "##vso[task.logissue type=warning]Contenedor auth-api desplegado correctamente."
+            fi
             exit 0
         displayName: 'Reconstruir y levantar contenedor auth-api'
