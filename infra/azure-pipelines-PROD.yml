@@ -44,7 +44,7 @@ steps:
           -backend-config="resource_group_name=rg-terraform-state-prod" \
           -backend-config="storage_account_name=terraformstate264402" \
           -backend-config="container_name=tfstate-back" \
-          -backend-config="terraform.tfstate"
+          -backend-config="key=terraform.tfstate"
     displayName: 'Terraform Init'
 
   - task: AzureCLI@2
