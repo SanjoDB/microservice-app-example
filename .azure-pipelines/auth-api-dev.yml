@@ -40,7 +40,7 @@ stages:
             echo "Reconstruyendo y levantando auth-api vía Docker Compose"
             cd $(remote_base_dir)
             
-            docker-compose build auth-api
+            (docker-compose build auth-api) 2>&1
             BUILD_STATUS=$?
             if [ $BUILD_STATUS -ne 0 ]; then
               echo "Error en la construcción del auth-api."
