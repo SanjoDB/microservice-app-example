@@ -6,37 +6,33 @@ trigger:
 variables:
   - group: terraform-credentials
 
-pool:
-  vmImage: 'ubuntu-latest'
+steps:
+- checkout: self
 
-jobs:
-- job: deploy
-  displayName: 'Deploy Infrastructure'
-  steps:
-  - checkout: self
+- task: TerraformInstaller@0
+  inputs:
+    terraformVersion: '1.5.5'
 
-  - task: TerraformInstaller@1
-    displayName: 'Setup Terraform'
-    inputs:
-      terraformVersion: 'latest'
+- script: |
+    export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+    export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+    export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+    export ARM_TENANT_ID=$(ARM_TENANT_ID)
 
-  - script: |
-      echo "Exportando variables..."
-      export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
-      export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
-      export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
-      export ARM_TENANT_ID=$(ARM_TENANT_ID)
+    terraform init -reconfigure \
+      -backend-config="resource_group_name=rg-terraform-state" \
+      -backend-config="storage_account_name=terraformstate2644016" \
+      -backend-config="container_name=tfstate" \
+      -backend-config="key=staging.terraform.tfstate"
+  workingDirectory: $(System.DefaultWorkingDirectory)/infra
+  displayName: 'Terraform Init'
 
-      echo "Inicializando Terraform..."
-      terraform init -reconfigure \
-        -backend-config="resource_group_name=rg-terraform-state" \
-        -backend-config="storage_account_name=terraformstate2644016" \
-        -backend-config="container_name=tfstate" \
-        -backend-config="key=terraform.tfstate"
-    workingDirectory: $(System.DefaultWorkingDirectory)/infra
-    displayName: 'Terraform Init'
+- script: |
+    terraform plan -var-file="terraform-staging.tfvars" -out=tfplan
+  workingDirectory: $(System.DefaultWorkingDirectory)/infra
+  displayName: 'Terraform Plan'
 
-  - script: |
-      terraform apply -auto-approve
-    workingDirectory: $(System.DefaultWorkingDirectory)/infra
-    displayName: 'Terraform Apply'
+- script: |
+    terraform apply -auto-approve tfplan
+  workingDirectory: $(System.DefaultWorkingDirectory)/infra
+  displayName: 'Terraform Apply'
