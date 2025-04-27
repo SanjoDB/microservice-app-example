@@ -1,6 +1,11 @@
 version: "3.3"
 
 services:
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
   auth-api:
     build: ./auth-api
     environment:
@@ -11,66 +16,29 @@ services:
       - "8000:8000"
     depends_on:
       - users-api
-    restart: on-failure
-    healthcheck:
-      test: ["CMD", "curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"username":"admin","password":"admin"}', "http://localhost:8000/login"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    networks:
-      - msa-network
 
   users-api:
     build: ./users-api
     environment:
       - JWT_SECRET=PRFT
       - SERVER_PORT=8083
-      - CACHE_HOST=cache
-      - CACHE_PORT=6379
-      - CACHE_TTL=300
-      - CACHE_ENABLED=true
     ports:
       - "8083:8083"
-    restart: on-failure
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/users"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    networks:
-      - msa-network
 
   todos-api:
     build: ./todos-api
-    ports:
-      - "8082:8082"
-    expose:
-      - "8082"
     environment:
-      - TODO_API_PORT=8082
       - JWT_SECRET=PRFT
+      - TODO_API_PORT=8082
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_CHANNEL=log_channel
+    ports:
+      - "8082:8082"
     depends_on:
       - redis
-    networks:
-      - msa-network
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "8080:8080"
-    expose:
-      - "8080"
-    environment:
-      - PORT=8080
-      - AUTH_API_ADDRESS=http://auth-api:8000
-      - TODOS_API_ADDRESS=http://todos-api:8082
-    networks:
-      - msa-network
-
-  log-message-processor:
+  log-processor:
     build: ./log-message-processor
     environment:
       - REDIS_HOST=redis
@@ -78,16 +46,15 @@ services:
       - REDIS_CHANNEL=log_channel
     depends_on:
       - redis
-    networks:
-      - msa-network
 
-  redis:
-    image: redis:7.0
+  frontend:
+    build: ./frontend
+    environment:
+      - PORT=8081
+      - AUTH_API_ADDRESS=http://auth-api:8000
+      - TODOS_API_ADDRESS=http://todos-api:8082
     ports:
-      - "6380:6379"
-    networks:
-      - msa-network
-
-networks:
-  msa-network:
-    driver: bridge
+      - "8081:8081"
+    depends_on:
+      - auth-api
+      - todos-api
