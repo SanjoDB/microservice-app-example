@@ -1,38 +1,42 @@
 trigger:
-  branches:
+  paths:
     include:
-      - main  # o tu branch correcto
+      - 'infra/dev'
+
+variables:
+  - name: ARM_CLIENT_ID
+    value: $(ARM_CLIENT_ID)
+  - name: ARM_CLIENT_SECRET
+    value: $(ARM_CLIENT_SECRET)
+  - name: ARM_SUBSCRIPTION_ID
+    value: $(ARM_SUBSCRIPTION_ID)
+  - name: ARM_TENANT_ID
+    value: $(ARM_TENANT_ID)
 
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  - group: terraform-credentials
+jobs:
+- job: deploy
+  displayName: 'Deploy Infrastructure'
+  steps:
+  - checkout: self
 
-steps:
-  - task: Checkout@1
-    displayName: 'Checkout código'
-
-  - task: TerraformInstaller@1
-    displayName: 'Instalar Terraform'
+  - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+    displayName: 'Setup Terraform'
     inputs:
-      terraformVersion: '1.5.5'
+      terraformVersion: 'latest'
 
-  - script: |
-      echo "Exportando variables de autenticación..."
-      export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
-      export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
-      export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
-      export ARM_TENANT_ID=$(ARM_TENANT_ID)
+  - task: TerraformCLI@0
+    displayName: 'Terraform Init'
+    inputs:
+      command: 'init'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/infra'
+      backendType: 'selfConfigured'
 
-      echo "Inicializando Terraform..."
-      terraform init -reconfigure \
-        -backend-config="resource_group_name=rg-terraform-state" \
-        -backend-config="storage_account_name=terraformstate2644016" \
-        -backend-config="container_name=tfstate" \
-        -backend-config="key=terraform.tfstate"
-
-      echo "Aplicando infraestructura..."
-      terraform apply -auto-approve
-    workingDirectory: infra
-    displayName: 'Inicializar y aplicar Terraform'
+  - task: TerraformCLI@0
+    displayName: 'Terraform Apply'
+    inputs:
+      command: 'apply'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/infra'
+      commandOptions: '-auto-approve'
