@@ -12,65 +12,64 @@ pool:
 
 variables:
   service_dir: 'users-api'
-  artifact_name: 'users-api-0.0.1-SNAPSHOT.jar'
-  vm_ip: '172.172.172.182'
-  remote_dir: '~/microservice-app-example/users-api'
+  vm_ip: '172.172.175.246'
+  remote_base_dir: '~/microservice-app-example'
+  remote_service_dir: '~/microservice-app-example/users-api'
 
 stages:
-- stage: Build
-  displayName: 'Validar compilación local en Azure DevOps'
+- stage: BuildAndDeploy
   jobs:
-    - job: BuildOnly
-      displayName: 'Compilar users-api'
-      steps:
-        - checkout: self
+  - job: BuildAuthApi
+    displayName: 'Build y Deploy de Auth API'
+    steps:
+      - checkout: self
 
-        - task: JavaToolInstaller@0
-          inputs:
-            versionSpec: '8'
-            jdkArchitectureOption: 'x64'
-            jdkSourceOption: 'PreInstalled'
-          displayName: 'Asegurar JDK 8'
+      - task: CopyFilesOverSSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          sourceFolder: $(service_dir)
+          contents: '**'
+          targetFolder: $(remote_service_dir)
+        displayName: 'Copiar carpeta actualizada a la VM'
 
-        - script: |
-            cd $(service_dir)
-            chmod +x mvnw
-            export JWT_SECRET=PRFT
-            export SERVER_PORT=8083
-            ./mvnw clean install -DskipTests
-          displayName: 'Compilar users-api (verificación)'
+      - task: SSH@0
+        inputs:
+          sshEndpoint: VM-DEV-CONNECTION
+          runOptions: inline
+          inline: |
+            echo "Reconstruyendo y levantando users-api vía Docker Compose"
+            cd $(remote_base_dir)
+            
+            # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
+            docker-compose build users-api > build_output.log 2>&1
+            BUILD_STATUS=$?
 
-- stage: DeployToVM
-  displayName: 'Deploy en VM de Desarrollo desde Git'
-  dependsOn: Build
-  condition: succeeded()
-  jobs:
-    - job: DeployUsersApi
-      displayName: 'Desplegar users-api directamente desde el repo en la VM'
-      steps:
-        - checkout: none
+            if [ $BUILD_STATUS -ne 0 ]; then
+              cat build_output.log
+              echo "##vso[task.logissue type=error]Error en la construcción del users-api."
+              exit 1
+            else
+              # Mostrar el resultado de la construcción como mensaje informativo
+              echo "##vso[task.logissue type=warning]Build de users-api completado exitosamente."
+            fi
 
-        - task: SSH@0
-          inputs:
-            sshEndpoint: VM-DEV-CONNECTION
-            runOptions: inline
-            inline: |
-              echo "Git Pull en la VM"
-              cd ~/microservice-app-example
-              git pull origin master
-
-              echo "Entrando a $(remote_dir)"
-              cd $(remote_dir)
-
-              echo "Cerrando instancia anterior de users-api"
-              pm2 delete users-api >/dev/null 2>&1 || echo "No había instancia corriendo"
-
-              echo "Compilando dentro de la VM"
-              export JWT_SECRET=PRFT
-              export SERVER_PORT=8083
-              chmod +x mvnw
-              ./mvnw clean install -DskipTests
-
-              echo "Iniciando users-api en PM2"
-              pm2 start "java -jar target/$(artifact_name)" --name users-api
-          displayName: 'Compilar y ejecutar dentro de la VM'
+            echo "Levantando contenedor users-api..."
+            # Forzar recreación del contenedor con --force-recreate y redireccionar salida
+            docker-compose up -d --force-recreate users-api > deploy_output.log 2>&1
+            DEPLOY_STATUS=$?
+            
+            if [ $DEPLOY_STATUS -ne 0 ]; then
+              cat deploy_output.log
+              echo "##vso[task.logissue type=error]Error al desplegar users-api."
+              exit 1
+            fi
+            
+            # Verificar que el contenedor esté ejecutándose
+            CONTAINER_STATUS=$(docker-compose ps -q users-api | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
+            if [ "$CONTAINER_STATUS" != "true" ]; then
+              echo "##vso[task.logissue type=error]El contenedor users-api no está en ejecución."
+              exit 1
+            else
+              echo "##vso[task.logissue type=warning]Contenedor users-api desplegado correctamente."
+            fi
+        displayName: 'Reconstruir y levantar contenedor users-api'
