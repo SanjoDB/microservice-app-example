@@ -41,20 +41,32 @@ stages:
             echo "Reconstruyendo y levantando auth-api vía Docker Compose"
             cd $(remote_base_dir)
             
-            docker-compose build auth-api
+            # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
+            docker-compose build auth-api > build_output.log 2>&1
             BUILD_STATUS=$?
 
             if [ $BUILD_STATUS -ne 0 ]; then
-              echo "Error en la construcción del auth-api."
+              cat build_output.log
+              echo "##vso[task.logissue type=error]Error en la construcción del auth-api."
               exit 1
+            else
+              # Mostrar el resultado de la construcción como mensaje informativo
+              echo "##vso[task.logissue type=warning]Build de auth-api completado exitosamente."
             fi
 
             echo "Levantando contenedor auth-api..."
-            # Forzar recreación del contenedor con --force-recreate
-            docker-compose up -d --force-recreate auth-api
+            # Forzar recreación del contenedor con --force-recreate y redireccionar salida
+            docker-compose up -d --force-recreate auth-api > deploy_output.log 2>&1
+            DEPLOY_STATUS=$?
+            
+            if [ $DEPLOY_STATUS -ne 0 ]; then
+              cat deploy_output.log
+              echo "##vso[task.logissue type=error]Error al desplegar auth-api."
+              exit 1
+            fi
             
             # Verificar que el contenedor esté ejecutándose
-            CONTAINER_STATUS=$(docker-compose ps -q auth-api | xargs docker inspect -f '{{.State.Running}}')
+            CONTAINER_STATUS=$(docker-compose ps -q auth-api | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
             if [ "$CONTAINER_STATUS" != "true" ]; then
               echo "##vso[task.logissue type=error]El contenedor auth-api no está en ejecución."
               exit 1
