@@ -12,8 +12,9 @@ pool:
 
 variables:
   service_dir: 'frontend'
-  vm_ip: '172.172.172.182'
-  remote_dir: '~/microservice-app-example/frontend'
+  vm_ip: '172.172.175.246'
+  remote_base_dir: '~/microservice-app-example'
+  remote_service_dir: '~/microservice-app-example/frontend'
 
 stages:
 - stage: BuildAndDeploy
@@ -23,38 +24,51 @@ stages:
     steps:
       - checkout: self
 
-      - task: NodeTool@0
-        inputs:
-          versionSpec: '14.x'
-        displayName: 'Instalar Node.js 14'
-
-      - script: |
-          sudo apt update
-          sudo apt install -y python2
-          sudo ln -sf /usr/bin/python2 /usr/bin/python
-        displayName: 'Instalar Python 2'
-
-      - script: |
-          cd frontend
-          npm ci
-          npm run build
-        displayName: 'Instalar dependencias y construir frontend'
-
       - task: CopyFilesOverSSH@0
         inputs:
           sshEndpoint: VM-DEV-CONNECTION
-          sourceFolder: $(Build.SourcesDirectory)/frontend/dist
+          sourceFolder: $(service_dir)
           contents: '**'
-          targetFolder: $(remote_dir)/dist
-        displayName: 'Copiar build del frontend a la VM'
+          targetFolder: $(remote_service_dir)
+        displayName: 'Copiar carpeta actualizada a la VM'
 
       - task: SSH@0
         inputs:
           sshEndpoint: VM-DEV-CONNECTION
           runOptions: inline
           inline: |
-            echo "Desplegando frontend en la VM"
-            pm2 delete frontend >/dev/null 2>&1 || echo "No existía proceso previo"
-            cd $(remote_dir)/dist
-            PORT=8080 AUTH_API_ADDRESS=http://127.0.0.1:8000 TODOS_API_ADDRESS=http://127.0.0.1:8082 pm2 serve . 8080 --spa --name frontend
-        displayName: 'Ejecutar en la VM'
+            echo "Reconstruyendo y levantando frontend vía Docker Compose"
+            cd $(remote_base_dir)
+            
+            # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
+            docker-compose build frontend > build_output.log 2>&1
+            BUILD_STATUS=$?
+
+            if [ $BUILD_STATUS -ne 0 ]; then
+              cat build_output.log
+              echo "##vso[task.logissue type=error]Error en la construcción del frontend."
+              exit 1
+            else
+              # Mostrar el resultado de la construcción como mensaje informativo
+              echo "##vso[task.logissue type=warning]Build de frontend completado exitosamente."
+            fi
+
+            echo "Levantando contenedor frontend..."
+            docker-compose up -d --force-recreate frontend > deploy_output.log 2>&1
+            DEPLOY_STATUS=$?
+            
+            if [ $DEPLOY_STATUS -ne 0 ]; then
+              cat deploy_output.log
+              echo "##vso[task.logissue type=error]Error al desplegar frontend."
+              exit 1
+            fi
+            
+            # Verificar que el contenedor esté ejecutándose
+            CONTAINER_STATUS=$(docker-compose ps -q frontend | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
+            if [ "$CONTAINER_STATUS" != "true" ]; then
+              echo "##vso[task.logissue type=error]El contenedor frontend no está en ejecución."
+              exit 1
+            else
+              echo "##vso[task.logissue type=warning]Contenedor frontend desplegado correctamente."
+            fi
+        displayName: 'Reconstruir y levantar contenedor frontend'
