@@ -7,39 +7,29 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: dockerhub-credentials
   - name: environment
     value: dev
   - name: tf_version
     value: '1.5.5'
+  - group: terraform-credentials
 
 steps:
-  - task: TerraformInstaller@0
-    inputs:
-      terraformVersion: '$(tf_version)'
-    displayName: 'Instalar Terraform'
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'Kevin'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+      export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+      export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+      export ARM_TENANT_ID=$(ARM_TENANT_ID)
 
-  - script: terraform --version
-    displayName: 'Verificar versión de Terraform'
-
-  - task: AzureCLI@2
-    inputs:
-      azureSubscription: 'Kevin'
-      scriptType: 'bash'
-      scriptLocation: 'inlineScript'
-      inlineScript: |
-        cd infra
-        
-        echo "Inicializando Terraform backend..."
-        terraform init -reconfigure \
-          -backend-config="resource_group_name=rg-terraform-state" \
-          -backend-config="storage_account_name=terraformstate2644016" \
-          -backend-config="container_name=tfstate" \
-          -backend-config="key=terraform.tfstate"
-
-        echo "Haciendo Terraform plan..."
-        terraform plan -var-file="terraform.tfvars" -out=tfplan
-
-        echo "Aplicando Terraform plan..."
-        terraform apply -auto-approve tfplan
-    displayName: 'Inicializar, planificar y aplicar infraestructura DEV'
+      cd infra
+      terraform init -reconfigure \
+        -backend-config="resource_group_name=rg-terraform-state" \
+        -backend-config="storage_account_name=terraformstate2644016" \
+        -backend-config="container_name=tfstate" \
+        -backend-config="key=terraform.tfstate"
+      terraform plan -var-file="terraform.tfvars" -out=tfplan
+      terraform apply -auto-approve tfplan
