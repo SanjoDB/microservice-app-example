@@ -7,11 +7,14 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  environment: dev
-  tf_version: '1.5.5'
+  - group: terraform-credentials
+  - name: environment
+    value: dev
+  - name: tf_version
+    value: '1.5.5'
 
 steps:
-  - task: TerraformInstaller@0
+  - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
     inputs:
       terraformVersion: '$(tf_version)'
     displayName: 'Instalar Terraform'
@@ -30,6 +33,11 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
+        export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(ARM_TENANT_ID)
+
         cd infra
 
         terraform init -reconfigure \
@@ -45,6 +53,11 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
+        export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(ARM_TENANT_ID)
+
         cd infra
 
         terraform plan -var-file="terraform-dev.tfvars" -out=tfplan
@@ -56,6 +69,11 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
+        export ARM_CLIENT_ID=$(ARM_CLIENT_ID)
+        export ARM_CLIENT_SECRET=$(ARM_CLIENT_SECRET)
+        export ARM_SUBSCRIPTION_ID=$(ARM_SUBSCRIPTION_ID)
+        export ARM_TENANT_ID=$(ARM_TENANT_ID)
+
         cd infra
 
         terraform apply -auto-approve tfplan
