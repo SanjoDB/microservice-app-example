@@ -20,6 +20,9 @@ stages:
       displayName: "Validar compilación de todos los servicios"
       steps:
         - checkout: self
+          clean: true
+          fetchDepth: 0
+          persistCredentials: true
         
         - task: DockerInstaller@0
           inputs:

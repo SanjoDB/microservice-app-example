@@ -23,6 +23,9 @@ stages:
     displayName: 'Deploy log-message-processor'
     steps:
       - checkout: self
+        clean: true
+        fetchDepth: 0
+        persistCredentials: true
 
       - task: CopyFilesOverSSH@0
         inputs:

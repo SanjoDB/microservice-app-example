@@ -23,6 +23,9 @@ stages:
     displayName: 'Build y Deploy de Auth API'
     steps:
       - checkout: self
+        clean: true
+        fetchDepth: 0
+        persistCredentials: true
 
       - task: CopyFilesOverSSH@0
         inputs:

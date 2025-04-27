@@ -20,6 +20,9 @@ stages:
       displayName: "Actualizar código y compilar todos los servicios"
       steps:
         - checkout: self
+          clean: true
+          fetchDepth: 0
+          persistCredentials: true
 
         - task: CopyFilesOverSSH@0
           inputs:
