@@ -60,7 +60,7 @@ steps:
 
         cd infra
 
-        terraform plan -var-file="terraform-prod.tfvars" -out=tfplan
+        terraform plan -var-file="terraform.prod.tfvars" -out=tfplan
     displayName: 'Terraform Plan'
 
   - task: AzureCLI@2
