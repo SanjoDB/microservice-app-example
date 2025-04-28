@@ -1,14 +1,15 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"time"
+    "context"
+    "encoding/json"
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "time"
+    "log"
 
-	jwt "github.com/dgrijalva/jwt-go"
+    jwt "github.com/dgrijalva/jwt-go"
 )
 
 var allowedUserHashes = map[string]interface{}{
@@ -58,16 +59,16 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
         MaxWaitTime: 2 * time.Second,
     }
 
-    err := Retry(retryConfig, func() error {
+    return Retry[User](retryConfig, func() (User, error) {
         token, err := h.getUserAPIToken(username)
         if err != nil {
-			log.Printf("Error generando token: %v", err)
+            log.Printf("Error generando token: %v", err)
             return user, err
         }
-		log.Printf("Token generado para usuario %s", username)
+        log.Printf("Token generado para usuario %s", username)
 
         url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
-		log.Printf("Intentando acceder a: %s", url)
+        log.Printf("Intentando acceder a: %s", url)
 
         req, _ := http.NewRequest("GET", url, nil)
         req.Header.Add("Authorization", "Bearer "+token)
@@ -75,27 +76,26 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
 
         resp, err := h.Client.Do(req)
         if err != nil {
-			log.Printf("Error en la petición HTTP: %v", err)
+            log.Printf("Error en la petición HTTP: %v", err)
             return user, err
         }
         defer resp.Body.Close()
 
         bodyBytes, err := ioutil.ReadAll(resp.Body)
         if err != nil {
-			log.Printf("Error leyendo respuesta: %v", err)
+            log.Printf("Error leyendo respuesta: %v", err)
             return user, err
         }
 
-		log.Printf("Respuesta del servidor: %s", string(bodyBytes))
+        log.Printf("Respuesta del servidor: %s", string(bodyBytes))
 
         if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-            return fmt.Errorf("could not get user data: %s", string(bodyBytes))
+            return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
         }
 
-        return user, json.Unmarshal(bodyBytes, &user)
+        err = json.Unmarshal(bodyBytes, &user)
+        return user, err
     })
-
-    return user, err
 }
 
 func (h *UserService) getUserAPIToken(username string) (string, error) {
