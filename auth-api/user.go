@@ -13,7 +13,7 @@ import (
 )
 
 var (
-    userServiceCB = NewCircuitBreaker(3, 10*time.Second)
+    userServiceCB = NewCircuitBreaker[User](3, 10*time.Second)
 )
 
 var allowedUserHashes = map[string]interface{}{
@@ -64,7 +64,7 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
     }
 
     return Retry[User](retryConfig, func() (User, error) {
-        err := userServiceCB.Execute(func() error {
+        return userServiceCB.Execute(func() (User, error) {
             token, err := h.getUserAPIToken(username)
             if err != nil {
                 log.Printf("Error generando token: %v", err)
@@ -99,10 +99,8 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
             }
 
             err = json.Unmarshal(bodyBytes, &user)
-            return err
+            return user, err
         })
-        
-        return user, err
     })
 }
 

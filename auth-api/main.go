@@ -163,7 +163,7 @@ const (
     StateOpen
 )
 
-type CircuitBreaker struct {
+type CircuitBreaker[T any] struct {
     mutex          sync.RWMutex
     state          State
     failureCount   int
@@ -174,8 +174,8 @@ type CircuitBreaker struct {
     halfOpenCalls    int
 }
 
-func NewCircuitBreaker(failureThreshold int, resetTimeout time.Duration) *CircuitBreaker {
-    return &CircuitBreaker{
+func NewCircuitBreaker[T any](failureThreshold int, resetTimeout time.Duration) *CircuitBreaker[T] {
+    return &CircuitBreaker[T]{
         state:           StateClosed,
         failureThreshold: failureThreshold,
         resetTimeout:    resetTimeout,
@@ -183,14 +183,15 @@ func NewCircuitBreaker(failureThreshold int, resetTimeout time.Duration) *Circui
     }
 }
 
-func (cb *CircuitBreaker) Execute(operation func() error) error {
+func (cb *CircuitBreaker[T]) Execute(operation func() (T, error)) (T, error) {
     if !cb.allowRequest() {
-        return errors.New("circuit breaker is open")
+        var zero T
+        return zero, errors.New("circuit breaker is open")
     }
 
-    err := operation()
+    result, err := operation()
     cb.recordResult(err)
-    return err
+    return result, err
 }
 
 func (cb *CircuitBreaker) allowRequest() bool {
