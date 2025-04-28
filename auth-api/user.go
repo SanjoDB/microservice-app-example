@@ -12,6 +12,10 @@ import (
     jwt "github.com/dgrijalva/jwt-go"
 )
 
+var (
+    userServiceCB = NewCircuitBreaker[User](3, 10*time.Second)
+)
+
 var allowedUserHashes = map[string]interface{}{
 	"admin_admin": nil,
 	"johnd_foo":   nil,
@@ -60,41 +64,43 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
     }
 
     return Retry[User](retryConfig, func() (User, error) {
-        token, err := h.getUserAPIToken(username)
-        if err != nil {
-            log.Printf("Error generando token: %v", err)
+        return userServiceCB.Execute(func() (User, error) {
+            token, err := h.getUserAPIToken(username)
+            if err != nil {
+                log.Printf("Error generando token: %v", err)
+                return user, err
+            }
+            log.Printf("Token generado para usuario %s", username)
+
+            url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
+            log.Printf("Intentando acceder a: %s", url)
+
+            req, _ := http.NewRequest("GET", url, nil)
+            req.Header.Add("Authorization", "Bearer "+token)
+            req = req.WithContext(ctx)
+
+            resp, err := h.Client.Do(req)
+            if err != nil {
+                log.Printf("Error en la petición HTTP: %v", err)
+                return user, err
+            }
+            defer resp.Body.Close()
+
+            bodyBytes, err := ioutil.ReadAll(resp.Body)
+            if err != nil {
+                log.Printf("Error leyendo respuesta: %v", err)
+                return user, err
+            }
+
+            log.Printf("Respuesta del servidor: %s", string(bodyBytes))
+
+            if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+                return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
+            }
+
+            err = json.Unmarshal(bodyBytes, &user)
             return user, err
-        }
-        log.Printf("Token generado para usuario %s", username)
-
-        url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
-        log.Printf("Intentando acceder a: %s", url)
-
-        req, _ := http.NewRequest("GET", url, nil)
-        req.Header.Add("Authorization", "Bearer "+token)
-        req = req.WithContext(ctx)
-
-        resp, err := h.Client.Do(req)
-        if err != nil {
-            log.Printf("Error en la petición HTTP: %v", err)
-            return user, err
-        }
-        defer resp.Body.Close()
-
-        bodyBytes, err := ioutil.ReadAll(resp.Body)
-        if err != nil {
-            log.Printf("Error leyendo respuesta: %v", err)
-            return user, err
-        }
-
-        log.Printf("Respuesta del servidor: %s", string(bodyBytes))
-
-        if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-            return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
-        }
-
-        err = json.Unmarshal(bodyBytes, &user)
-        return user, err
+        })
     })
 }
 
