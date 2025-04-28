@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 )
@@ -49,36 +50,44 @@ func (h *UserService) Login(ctx context.Context, username, password string) (Use
 }
 
 func (h *UserService) getUser(ctx context.Context, username string) (User, error) {
-	var user User
+    var user User
 
-	token, err := h.getUserAPIToken(username)
-	if err != nil {
-		return user, err
-	}
-	url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("Authorization", "Bearer "+token)
+    retryConfig := RetryConfig{
+        MaxAttempts: 3,
+        WaitTime: 100 * time.Millisecond,
+        MaxWaitTime: 2 * time.Second,
+    }
 
-	req = req.WithContext(ctx)
+    err := Retry(retryConfig, func() error {
+        token, err := h.getUserAPIToken(username)
+        if err != nil {
+            return err
+        }
+        url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
+        req, _ := http.NewRequest("GET", url, nil)
+        req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := h.Client.Do(req)
-	if err != nil {
-		return user, err
-	}
+        req = req.WithContext(ctx)
 
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return user, err
-	}
+        resp, err := h.Client.Do(req)
+        if err != nil {
+            return err
+        }
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
-	}
+        defer resp.Body.Close()
+        bodyBytes, err := ioutil.ReadAll(resp.Body)
+        if err != nil {
+            return err
+        }
 
-	err = json.Unmarshal(bodyBytes, &user)
+        if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+            return fmt.Errorf("could not get user data: %s", string(bodyBytes))
+        }
 
-	return user, err
+        return json.Unmarshal(bodyBytes, &user)
+    })
+
+    return user, err
 }
 
 func (h *UserService) getUserAPIToken(username string) (string, error) {

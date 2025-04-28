@@ -12,23 +12,52 @@ const {HttpLogger} = require('zipkin-transport-http');
 const zipkinMiddleware = require('zipkin-instrumentation-express').expressMiddleware;
 
 const logChannel = process.env.REDIS_CHANNEL || 'log_channel';
-const redisClient = require("redis").createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  retry_strategy: function (options) {
-      if (options.error && options.error.code === 'ECONNREFUSED') {
-          return new Error('The server refused the connection');
-      }
-      if (options.total_retry_time > 1000 * 60 * 60) {
-          return new Error('Retry time exhausted');
-      }
-      if (options.attempt > 10) {
-          console.log('reattemtping to connect to redis, attempt #' + options.attempt)
-          return undefined;
-      }
-      return Math.min(options.attempt * 100, 2000);
-  }        
-});
+const { RetryConfig, retry } = require('./retry');
+const retryConfig = new RetryConfig(3, 100, 2000);
+
+// Crear cliente Redis con retry
+const createRedisClient = async () => {
+    return retry(retryConfig, () => {
+        return new Promise((resolve, reject) => {
+            const client = require("redis").createClient({
+                host: process.env.REDIS_HOST || 'localhost',
+                port: process.env.REDIS_PORT || 6379,
+                retry_strategy: function (options) {
+                    if (options.error && options.error.code === 'ECONNREFUSED') {
+                        return new Error('The server refused the connection');
+                    }
+                    if (options.total_retry_time > 1000 * 60 * 60) {
+                        return new Error('Retry time exhausted');
+                    }
+                    if (options.attempt > 10) {
+                        return undefined;
+                    }
+                    return Math.min(options.attempt * 100, 2000);
+                }
+            });
+
+            client.on('connect', () => resolve(client));
+            client.on('error', (err) => reject(err));
+        });
+    });
+};
+
+// Inicializar la aplicación con retry en la conexión Redis
+const initializeApp = async () => {
+    try {
+        const redisClient = await createRedisClient();
+        const routes = require('./routes');
+        routes(app, {tracer, redisClient, logChannel});
+        
+        app.listen(port, function () {
+            console.log('todo list RESTful API server started on: ' + port);
+        });
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        process.exit(1);
+    }
+};
+
 const port = process.env.TODO_API_PORT || 8082
 const jwtSecret = process.env.JWT_SECRET || "foo"
 
@@ -56,9 +85,4 @@ app.use(function (err, req, res, next) {
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
-const routes = require('./routes')
-routes(app, {tracer, redisClient, logChannel})
-
-app.listen(port, function () {
-  console.log('todo list RESTful API server started on: ' + port)
-})
+initializeApp();

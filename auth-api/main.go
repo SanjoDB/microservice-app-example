@@ -121,3 +121,34 @@ func getLoginHandler(userService UserService) echo.HandlerFunc {
 
 	return echo.HandlerFunc(f)
 }
+
+type RetryConfig struct {
+    MaxAttempts  int
+    WaitTime     time.Duration
+    MaxWaitTime  time.Duration
+}
+
+func Retry(config RetryConfig, operation func() error) error {
+    var err error
+    waitTime := config.WaitTime
+
+    for attempt := 1; attempt <= config.MaxAttempts; attempt++ {
+        err = operation()
+        if err == nil {
+            return nil
+        }
+
+        if attempt == config.MaxAttempts {
+            break
+        }
+
+        // Exponential backoff
+        if waitTime < config.MaxWaitTime {
+            waitTime = waitTime * 2
+        }
+        
+        time.Sleep(waitTime)
+    }
+
+    return err
+}
