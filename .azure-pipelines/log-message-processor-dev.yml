@@ -12,6 +12,7 @@ pool:
 
 variables:
   service_dir: 'log-message-processor'
+  service_name: 'log-processor'
   vm_ip: '172.172.175.246'
   remote_base_dir: '~/microservice-app-example'
   remote_service_dir: '~/microservice-app-example/log-message-processor'
@@ -40,39 +41,41 @@ stages:
           sshEndpoint: VM-DEV-CONNECTION
           runOptions: inline
           inline: |
-            echo "Reconstruyendo y levantando log-message-processor vía Docker Compose"
+            echo "Reconstruyendo y levantando log-processor vía Docker Compose"
             cd $(remote_base_dir)
             
             # Redirigir la salida de docker-compose a un archivo para evitar que Azure lo marque como error
-            docker-compose build log-processor > build_output.log 2>&1
+            docker-compose build $(service_name) > build_output.log 2>&1
             BUILD_STATUS=$?
 
             if [ $BUILD_STATUS -ne 0 ]; then
               cat build_output.log
-              echo "##vso[task.logissue type=error]Error en la construcción del log-message-processor."
+              echo "##vso[task.logissue type=error]Error en la construcción del log-processor."
               exit 1
             else
-              # Mostrar el resultado de la construcción como mensaje informativo
-              echo "##vso[task.logissue type=warning]Build de log-message-processor completado exitosamente."
+              echo "##vso[task.logissue type=warning]Build de log-processor completado exitosamente."
             fi
 
-            echo "Levantando contenedor log-message-processor..."
-            # Forzar recreación del contenedor con --force-recreate y redireccionar salida
-            docker-compose up -d --force-recreate log-processor > deploy_output.log 2>&1
+            echo "Levantando contenedor log-processor..."
+            docker-compose up -d --force-recreate $(service_name) > deploy_output.log 2>&1
             DEPLOY_STATUS=$?
             
             if [ $DEPLOY_STATUS -ne 0 ]; then
               cat deploy_output.log
-              echo "##vso[task.logissue type=error]Error al desplegar log-message-processor."
+              echo "##vso[task.logissue type=error]Error al desplegar log-processor."
               exit 1
             fi
             
-            # Verificar que el contenedor esté ejecutándose
-            CONTAINER_STATUS=$(docker-compose ps -q log-processor | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
+            # Agregar un pequeño delay para asegurar que el contenedor tenga tiempo de iniciar
+            sleep 5
+            
+            # Verificar que el contenedor esté ejecutándose usando el nombre correcto del servicio
+            CONTAINER_STATUS=$(docker-compose ps -q $(service_name) | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)
             if [ "$CONTAINER_STATUS" != "true" ]; then
-              echo "##vso[task.logissue type=error]El contenedor log-message-processor no está en ejecución."
+              echo "##vso[task.logissue type=error]El contenedor log-processor no está en ejecución."
+              docker-compose logs $(service_name)  # Agregar logs para diagnóstico
               exit 1
             else
-              echo "##vso[task.logissue type=warning]Contenedor log-message-processor desplegado correctamente."
+              echo "##vso[task.logissue type=warning]Contenedor log-processor desplegado correctamente."
             fi
-        displayName: 'Reconstruir y levantar contenedor log-message-processor'
+        displayName: 'Reconstruir y levantar contenedor log-processor'
