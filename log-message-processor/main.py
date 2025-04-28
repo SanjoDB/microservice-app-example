@@ -58,7 +58,14 @@ def http_transport(encoded_span, zipkin_url):
 @retry(retry_config)
 def process_message(item):
     def _process():
-        return json.loads(str(item['data'].decode("utf-8")))
+        if item['type'] == 'message':
+            if isinstance(item['data'], bytes):
+                return json.loads(item['data'].decode("utf-8"))
+            elif isinstance(item['data'], int):
+                return {'data': item['data']}
+            else:
+                return json.loads(str(item['data']))
+        return None
     
     return message_cb.execute(_process)
 
@@ -80,31 +87,36 @@ if __name__ == '__main__':
 
     for item in pubsub.listen():
         try:
-            message = process_message(item)
-        except Exception as e:
-            log_message(e)
-            continue
+            if item['type'] == 'message':  # Solo procesar mensajes reales
+                message = process_message(item)
+                if message:  # Solo procesar si hay mensaje
+                    if not zipkin_url or 'zipkinSpan' not in message:
+                        log_message(message)
+                        continue
 
-        if not zipkin_url or 'zipkinSpan' not in message:
-            log_message(message)
-            continue
-
-        span_data = message['zipkinSpan']
-        try:
-            with zipkin_span(
-                service_name='log-message-processor',
-                zipkin_attrs=ZipkinAttrs(
-                    trace_id=span_data['_traceId']['value'],
-                    span_id=generate_random_64bit_string(),
-                    parent_span_id=span_data['_spanId'],
-                    is_sampled=span_data['_sampled']['value'],
-                    flags=None
-                ),
-                span_name='save_log',
-                transport_handler=transport_handler,
-                sample_rate=100
-            ):
-                log_message(message)
+                    span_data = message['zipkinSpan']
+                    try:
+                        with zipkin_span(
+                            service_name='log-message-processor',
+                            zipkin_attrs=ZipkinAttrs(
+                                trace_id=span_data['_traceId']['value'],
+                                span_id=generate_random_64bit_string(),
+                                parent_span_id=span_data['_spanId'],
+                                is_sampled=span_data['_sampled']['value'],
+                                flags=None
+                            ),
+                            span_name='save_log',
+                            transport_handler=transport_handler,
+                            sample_rate=100
+                        ):
+                            log_message(message)
+                    except Exception as e:
+                        print('did not send data to Zipkin: {}'.format(e))
+                        log_message(message)
         except Exception as e:
-            print('did not send data to Zipkin: {}'.format(e))
-            log_message(message)
+            print(f"Error processing message: {str(e)}")
+            try:
+                log_message({"error": str(e)})
+            except Exception as log_error:
+                print(f"Error logging message: {str(log_error)}")
+            continue
