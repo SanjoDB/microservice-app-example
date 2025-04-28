@@ -2,6 +2,7 @@
 const cache = require('memory-cache');
 const {Annotation, jsonEncoder: {JSON_V2}} = require('zipkin');
 const { RetryConfig, retry } = require('./retry');
+const CircuitBreaker = require('./circuit_breaker');
 
 const OPERATION_CREATE = 'CREATE',
       OPERATION_DELETE = 'DELETE';
@@ -12,68 +13,77 @@ class TodoController {
         this._redisClient = redisClient;
         this._logChannel = logChannel;
         this._retryConfig = new RetryConfig(3, 100, 2000);
+        
+        // Inicializar los circuit breakers para cada operación
+        this._redisCircuitBreaker = new CircuitBreaker(3, 10000);
+        this._cacheCircuitBreaker = new CircuitBreaker(3, 10000);
     }
 
     async _logOperation(opName, username, todoId) {
-        await retry(this._retryConfig, () => {
-            return new Promise((resolve, reject) => {
-                this._tracer.scoped(() => {
-                    const traceId = this._tracer.id;
-                    this._redisClient.publish(this._logChannel, JSON.stringify({
-                        zipkinSpan: traceId,
-                        opName: opName,
-                        username: username,
-                        todoId: todoId,
-                    }), (err) => {
-                        if (err) reject(err);
-                        else resolve();
+        return this._redisCircuitBreaker.execute(async () => {
+            return retry(this._retryConfig, () => {
+                return new Promise((resolve, reject) => {
+                    this._tracer.scoped(() => {
+                        const traceId = this._tracer.id;
+                        this._redisClient.publish(this._logChannel, JSON.stringify({
+                            zipkinSpan: traceId,
+                            opName: opName,
+                            username: username,
+                            todoId: todoId,
+                        }), (err) => {
+                            if (err) reject(err);
+                            else resolve();
+                        });
                     });
                 });
             });
         });
     }
 
-    _getTodoData(userID) {
-        return retry(this._retryConfig, () => {
-            return new Promise((resolve) => {
-                const data = cache.get(userID);
-                if (data == null) {
-                    const newData = {
-                        items: {
-                            '1': {
-                                id: 1,
-                                content: "Create new todo",
+    async _getTodoData(userID) {
+        return this._cacheCircuitBreaker.execute(async () => {
+            return retry(this._retryConfig, () => {
+                return new Promise((resolve) => {
+                    const data = cache.get(userID);
+                    if (data == null) {
+                        const newData = {
+                            items: {
+                                '1': {
+                                    id: 1,
+                                    content: "Create new todo",
+                                },
+                                '2': {
+                                    id: 2,
+                                    content: "Update me",
+                                },
+                                '3': {
+                                    id: 3,
+                                    content: "Delete example ones",
+                                }
                             },
-                            '2': {
-                                id: 2,
-                                content: "Update me",
-                            },
-                            '3': {
-                                id: 3,
-                                content: "Delete example ones",
-                            }
-                        },
-                        lastInsertedID: 3
-                    };
-                    this._setTodoData(userID, newData);
-                    resolve(newData);
-                } else {
-                    resolve(data);
-                }
+                            lastInsertedID: 3
+                        };
+                        this._setTodoData(userID, newData);
+                        resolve(newData);
+                    } else {
+                        resolve(data);
+                    }
+                });
             });
         });
     }
 
-    _setTodoData(userID, data) {
-        return retry(this._retryConfig, () => {
-            return new Promise((resolve) => {
-                cache.put(userID, data);
-                resolve();
+    async _setTodoData(userID, data) {
+        return this._cacheCircuitBreaker.execute(async () => {
+            return retry(this._retryConfig, () => {
+                return new Promise((resolve) => {
+                    cache.put(userID, data);
+                    resolve();
+                });
             });
         });
     }
 
-    // Los métodos públicos ahora manejarán async/await
     async list(req, res) {
         try {
             const data = await this._getTodoData(req.user.username);
@@ -89,9 +99,9 @@ class TodoController {
             const data = await this._getTodoData(req.user.username);
             const todo = {
                 content: req.body.content,
-                id: data.lastInsertedID
+                id: data.lastInsertedID + 1
             };
-            data.items[data.lastInsertedID] = todo;
+            data.items[data.lastInsertedID + 1] = todo;
             data.lastInsertedID++;
             
             await this._setTodoData(req.user.username, data);
