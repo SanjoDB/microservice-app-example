@@ -98,7 +98,8 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
                 return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
             }
 
-            return err = json.Unmarshal(bodyBytes, &user)
+            err = json.Unmarshal(bodyBytes, &user)
+            return err
         })
         
         return user, err
