@@ -6,6 +6,8 @@ import (
     "net/http"
     "os"
     "time"
+    "errors"
+    "sync"
 
     jwt "github.com/dgrijalva/jwt-go"
     "github.com/labstack/echo"
@@ -128,7 +130,6 @@ type RetryConfig struct {
     MaxWaitTime  time.Duration
 }
 
-// Modificar para soportar cualquier tipo de retorno
 func Retry[T any](config RetryConfig, operation func() (T, error)) (T, error) {
     var result T
     var err error
@@ -144,7 +145,6 @@ func Retry[T any](config RetryConfig, operation func() (T, error)) (T, error) {
             break
         }
 
-        // Exponential backoff
         if waitTime < config.MaxWaitTime {
             waitTime = waitTime * 2
         }
@@ -153,4 +153,94 @@ func Retry[T any](config RetryConfig, operation func() (T, error)) (T, error) {
     }
 
     return result, err
+}
+
+type State int
+
+const (
+    StateClosed State = iota
+    StateHalfOpen
+    StateOpen
+)
+
+type CircuitBreaker struct {
+    mutex          sync.RWMutex
+    state          State
+    failureCount   int
+    failureThreshold  int
+    resetTimeout   time.Duration
+    lastFailureTime time.Time
+    halfOpenMaxCalls int
+    halfOpenCalls    int
+}
+
+func NewCircuitBreaker(failureThreshold int, resetTimeout time.Duration) *CircuitBreaker {
+    return &CircuitBreaker{
+        state:           StateClosed,
+        failureThreshold: failureThreshold,
+        resetTimeout:    resetTimeout,
+        halfOpenMaxCalls: 1,
+    }
+}
+
+func (cb *CircuitBreaker) Execute(operation func() error) error {
+    if !cb.allowRequest() {
+        return errors.New("circuit breaker is open")
+    }
+
+    err := operation()
+    cb.recordResult(err)
+    return err
+}
+
+func (cb *CircuitBreaker) allowRequest() bool {
+    cb.mutex.RLock()
+    defer cb.mutex.RUnlock()
+
+    switch cb.state {
+    case StateClosed:
+        return true
+    case StateOpen:
+        if time.Since(cb.lastFailureTime) > cb.resetTimeout {
+            cb.mutex.RUnlock()
+            cb.mutex.Lock()
+            cb.state = StateHalfOpen
+            cb.halfOpenCalls = 0
+            cb.mutex.Unlock()
+            cb.mutex.RLock()
+            return true
+        }
+        return false
+    case StateHalfOpen:
+        return cb.halfOpenCalls < cb.halfOpenMaxCalls
+    default:
+        return false
+    }
+}
+
+func (cb *CircuitBreaker) recordResult(err error) {
+    cb.mutex.Lock()
+    defer cb.mutex.Unlock()
+
+    switch cb.state {
+    case StateClosed:
+        if err != nil {
+            cb.failureCount++
+            if cb.failureCount >= cb.failureThreshold {
+                cb.state = StateOpen
+                cb.lastFailureTime = time.Now()
+            }
+        } else {
+            cb.failureCount = 0
+        }
+    case StateHalfOpen:
+        cb.halfOpenCalls++
+        if err != nil {
+            cb.state = StateOpen
+            cb.lastFailureTime = time.Now()
+        } else if cb.halfOpenCalls >= cb.halfOpenMaxCalls {
+            cb.state = StateClosed
+            cb.failureCount = 0
+        }
+    }
 }
