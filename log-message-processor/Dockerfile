@@ -3,6 +3,7 @@ FROM python:3.6
 WORKDIR /app
 
 COPY main.py .
+COPY retry.py .
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt

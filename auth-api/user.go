@@ -1,13 +1,15 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
+    "context"
+    "encoding/json"
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "time"
+    "log"
 
-	jwt "github.com/dgrijalva/jwt-go"
+    jwt "github.com/dgrijalva/jwt-go"
 )
 
 var allowedUserHashes = map[string]interface{}{
@@ -49,42 +51,59 @@ func (h *UserService) Login(ctx context.Context, username, password string) (Use
 }
 
 func (h *UserService) getUser(ctx context.Context, username string) (User, error) {
-	var user User
+    var user User
 
-	token, err := h.getUserAPIToken(username)
-	if err != nil {
-		return user, err
-	}
-	url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("Authorization", "Bearer "+token)
+    retryConfig := RetryConfig{
+        MaxAttempts: 3,
+        WaitTime: 100 * time.Millisecond,
+        MaxWaitTime: 2 * time.Second,
+    }
 
-	req = req.WithContext(ctx)
+    return Retry[User](retryConfig, func() (User, error) {
+        token, err := h.getUserAPIToken(username)
+        if err != nil {
+            log.Printf("Error generando token: %v", err)
+            return user, err
+        }
+        log.Printf("Token generado para usuario %s", username)
 
-	resp, err := h.Client.Do(req)
-	if err != nil {
-		return user, err
-	}
+        url := fmt.Sprintf("%s/users/%s", h.UserAPIAddress, username)
+        log.Printf("Intentando acceder a: %s", url)
 
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return user, err
-	}
+        req, _ := http.NewRequest("GET", url, nil)
+        req.Header.Add("Authorization", "Bearer "+token)
+        req = req.WithContext(ctx)
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
-	}
+        resp, err := h.Client.Do(req)
+        if err != nil {
+            log.Printf("Error en la petición HTTP: %v", err)
+            return user, err
+        }
+        defer resp.Body.Close()
 
-	err = json.Unmarshal(bodyBytes, &user)
+        bodyBytes, err := ioutil.ReadAll(resp.Body)
+        if err != nil {
+            log.Printf("Error leyendo respuesta: %v", err)
+            return user, err
+        }
 
-	return user, err
+        log.Printf("Respuesta del servidor: %s", string(bodyBytes))
+
+        if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+            return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
+        }
+
+        err = json.Unmarshal(bodyBytes, &user)
+        return user, err
+    })
 }
 
 func (h *UserService) getUserAPIToken(username string) (string, error) {
-	token := jwt.New(jwt.SigningMethodHS256)
-	claims := token.Claims.(jwt.MapClaims)
-	claims["username"] = username
-	claims["scope"] = "read"
-	return token.SignedString([]byte(jwtSecret))
+    token := jwt.New(jwt.SigningMethodHS256)
+    claims := token.Claims.(jwt.MapClaims)
+    claims["username"] = username
+    claims["scope"] = "read"
+    // Agregar expiración
+    claims["exp"] = time.Now().Add(time.Hour * 1).Unix()
+    return token.SignedString([]byte(jwtSecret))
 }
